@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Maps a configurator Base-class module code to a picture in this directory.",
+    "",
+    "Filename matching already handles the obvious cases: the export's base code",
+    "'VX' finds 'Pilot VX.jpg' on its own. This file is for the exceptions - when",
+    "the code the configurator writes does not appear in the picture's filename,",
+    "or when two pictures match equally well and the skill would otherwise stop",
+    "and ask.",
+    "",
+    "Add an entry the first time a machine is quoted and the picture is not found:",
+    "the left side is exactly what the export's Base row has in its Module column,",
+    "the right side is a picture name from this directory (without the extension).",
+    "Codes are matched without regard to case, spaces or punctuation."
+  ],
+  "_example": {
+    "TK": "Compact TK",
+    "VALID-LR": "Valid LR"
+  },
+  "aliases": {}
+}

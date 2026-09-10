@@ -106,10 +106,33 @@ assets/systems/
 `.jpg`, `.jpeg` and `.png` are accepted. Adding a machine means dropping a file
 in — there is no index to update and no code to change.
 
+Two things in that directory are deliberately not library entries:
+`aliases.json` (not an image) and `alternates/` (a directory). `list_systems`
+filters on the image extensions, so alternate views of a machine can be kept
+alongside without competing for a match. Reach one with `--picture`.
+
+Where a machine has both a plain and an Opera-series photo, the library entry
+is the Opera one and the other view sits in `alternates/`.
+
 ### How a picture is chosen
 
-The export never names the system, so it is inferred. Candidates are gathered
-in order of how much they can be trusted:
+Three mechanisms, in descending order of authority:
+
+1. **`--system` / `--picture`** — an explicit instruction for this one build.
+2. **`aliases.json`** — a mapping someone already decided on, so it outranks
+   anything inferred. Keys are Base-class module codes as the export writes
+   them, compared without regard to case, spaces or punctuation; values are
+   picture names from the directory, without the extension. A key pointing at a
+   picture that is not there is reported rather than silently ignored, and a
+   malformed file produces a warning and falls back to inference.
+3. **Filename inference** — described below.
+
+Reach for an alias when the configurator's code does not resemble the filename,
+or when inference is ambiguous and the same question would otherwise come up on
+every quote for that machine.
+
+The export never names the system, so inference gathers candidates in order of
+how much they can be trusted:
 
 1. the module code of the `Base`-class row — the machine itself, e.g. `VX`
 2. that row's description
@@ -125,7 +148,8 @@ of the wrong machine is worse than one carrying no photo, so an ambiguous case
 becomes a question for the sales manager rather than a guess.
 
 Overrides: `--system "Pilot VX"` names a library entry, `--picture PATH` uses a
-file directly, `--no-picture` leaves the space empty.
+file directly (this is how to reach `alternates/`), `--no-picture` leaves the
+space empty.
 
 ### Sizing
 

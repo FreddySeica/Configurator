@@ -16,7 +16,10 @@ person completes them in Word before the offer is sent.
 
 The system photo comes from `assets/systems/`, where the filename is the
 machine name (`Pilot VX.jpg`); the right one is matched from the export and
-scaled to fit the template's layout box. Training line items come from
+scaled to fit the template's layout box. Stocked today: Compact Digital XL,
+Compact SL SC, Compact TK, Pilot VX, Valid LR, Valid SL — with other views in
+`alternates/` and `aliases.json` for module codes that do not resemble the
+filename. Training line items come from
 `assets/trainings.json` and are numbered `ADV_TRAIN#1`, `#2`, … in the order
 requested.
 

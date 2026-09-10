@@ -206,6 +206,20 @@ def _tokens(text: str) -> list[str]:
     return [t for t in re.split(r"[^0-9a-z]+", text.lower()) if t]
 
 
+def load_aliases(directory: str) -> dict:
+    """Module code -> picture name overrides, keyed by a normalised code."""
+    path = os.path.join(directory, "aliases.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh).get("aliases", {})
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"warning: could not read {path}: {exc}", file=sys.stderr)
+        return {}
+    return {re.sub(r"[^0-9a-z]", "", str(k).lower()): v for k, v in raw.items()}
+
+
 def list_systems(directory: str) -> list[str]:
     """Every picture available, by system name (the filename without extension)."""
     if not os.path.isdir(directory):
@@ -245,9 +259,24 @@ def resolve_picture(directory: str, wanted: str | None, cfg: dict) -> tuple[str 
         return None, (f"'{wanted}' does not match any picture. Available: "
                       + ", ".join(available))
 
+    base = next((i for i in cfg["items"] if i["class"].lower() == "base"), None)
+
+    # An alias is a decision someone already made about this machine, so it
+    # outranks anything inferred from the filenames.
+    aliases = load_aliases(directory)
+    if base and aliases:
+        code = re.sub(r"[^0-9a-z]", "", base["module"].lower())
+        if code in aliases:
+            target = aliases[code]
+            key = re.sub(r"[^0-9a-z]", "", str(target).lower())
+            if key in by_norm:
+                return os.path.join(directory, _picture_file(directory, by_norm[key])), \
+                       f"alias {base['module']} -> {target}"
+            return None, (f"aliases.json maps '{base['module']}' to '{target}', "
+                          f"which is not in {directory}")
+
     # Candidates, strongest signal first: the base machine's module code, then
     # its description, then the configuration title.
-    base = next((i for i in cfg["items"] if i["class"].lower() == "base"), None)
     candidates = []
     if base:
         candidates.append(base["module"])

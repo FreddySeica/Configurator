@@ -131,15 +131,36 @@ if it was left blank. Do not describe the offer as ready to send.
 
 ## The system picture
 
-`assets/systems/` holds one image per machine, named after the system —
-`Pilot VX.jpg`, `Pilot V8.jpg`. That filename *is* the system name, so adding a
-machine means dropping a file in, nothing else. `.jpg`, `.jpeg` and `.png` all
-work.
+`assets/systems/` holds one image per machine, named after the system. The
+filename *is* the system name, so adding a machine means dropping a file in and
+nothing else. `.jpg`, `.jpeg` and `.png` all work. Currently stocked:
 
-Matching is deliberately conservative: it looks for the Base module code as a
-whole word in the filename (`VX` → `Pilot VX`), and when two pictures match
-equally well it refuses and asks rather than guessing. A quote carrying a photo
-of the wrong machine is worse than one carrying no photo at all.
+```
+Compact Digital XL   Compact SL SC   Compact TK
+Pilot VX             Valid LR        Valid SL
+```
+
+Where a machine has both a plain and an Opera-series photo, the library holds
+the Opera one; the other views live in `assets/systems/alternates/`, which is
+out of the matching pool so it cannot make a match ambiguous. To use one, pass
+`--picture "assets/systems/alternates/VALID-LR-02.jpg"`.
+
+Matching looks for the Base module code as a whole word in the filename, so
+`VX` finds `Pilot VX` and `TK` finds `Compact TK`. It is deliberately
+conservative: when several pictures match equally well — a bare `Compact` fits
+three of them — it inserts nothing and says so. A quote carrying a photo of the
+wrong machine is worse than one carrying no photo at all.
+
+When the configurator's code does not resemble the filename, record it once in
+`assets/systems/aliases.json` instead of passing `--system` forever:
+
+```json
+"aliases": { "TK": "Compact TK", "VALID-LR": "Valid LR" }
+```
+
+That file starts empty. If a build reports `NONE` for the picture and the user
+tells you which machine it is, offer to add the alias — it is the difference
+between fixing it once and answering the same question every quote.
 
 Pictures are scaled to fit inside the template's 4.91 × 3.93 in box without
 distortion, so a wide or tall photo comes out smaller rather than shoving the
@@ -184,5 +205,7 @@ will happily split those tokens across runs if they are retyped.
 - `assets/rfq_template.docx` — letterhead, empty Configuration table, pricing
   and terms boilerplate
 - `assets/trainings.json` — the training catalogue
-- `assets/systems/` — one picture per machine, filename = system name
+- `assets/systems/` — one picture per machine, filename = system name;
+  `aliases.json` for module codes that do not resemble it, `alternates/` for
+  other views
 - `references/format.md` — export layout, template anatomy, catalogue format
