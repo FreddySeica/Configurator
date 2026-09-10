@@ -91,6 +91,105 @@ merged, the text set bold, and the cell shaded `E0E0E0` — the same grey the
 template already uses for its other header rows, so the result looks native
 rather than bolted on.
 
+## The system picture
+
+`assets/systems/` is the picture library. One image per machine, and the
+filename without its extension *is* the system name:
+
+```
+assets/systems/
+    Pilot VX.jpg
+    Pilot V8.jpg
+    Pilot SL.jpg
+```
+
+`.jpg`, `.jpeg` and `.png` are accepted. Adding a machine means dropping a file
+in — there is no index to update and no code to change.
+
+### How a picture is chosen
+
+The export never names the system, so it is inferred. Candidates are gathered
+in order of how much they can be trusted:
+
+1. the module code of the `Base`-class row — the machine itself, e.g. `VX`
+2. that row's description
+3. the configuration title
+
+Each candidate is split into words and compared against the words of every
+filename. Generic words (`pilot`, `seica`, `series`) are ignored, so the match
+turns on the distinctive part: `VX` picks `Pilot VX` and not `Pilot V8`.
+
+Matching is intentionally strict. If nothing matches, or two pictures match
+equally well, the script inserts nothing and says why. A quote carrying a photo
+of the wrong machine is worse than one carrying no photo, so an ambiguous case
+becomes a question for the sales manager rather than a guess.
+
+Overrides: `--system "Pilot VX"` names a library entry, `--picture PATH` uses a
+file directly, `--no-picture` leaves the space empty.
+
+### Sizing
+
+The example offer sits the render in a **4.91 × 3.93 in** box (`PICTURE_BOX_IN`
+in `build_rfq.py`). New pictures are scaled to fit *inside* that box with their
+proportions intact, so a 4:1 panorama comes out 4.91 × 1.23 in and a tall
+portrait 0.98 × 3.93 in. Neither can push the rest of the page around, and
+`check_rfq.py` fails if a picture ever exceeds the box.
+
+The picture lives in the centred paragraph directly beneath the description
+block. `find_picture_anchor` locates it by that centring rather than by index,
+and the paragraph stays in the template even when empty — it is the anchor the
+script writes into.
+
+## The training catalogue
+
+`assets/trainings.json` lists what can be offered. Adding a training type is a
+data edit, not a code change:
+
+```json
+{
+  "key": "adv1w",
+  "part_number": "ADV_TRAIN",
+  "label": "Advanced hardware & programming - 1 week onsite",
+  "description": "One week onsite of one Seica engineer for advanced hardware and programming training session",
+  "numbered": true
+}
+```
+
+| Field | Purpose |
+|---|---|
+| `key` | what `--training` takes on the command line |
+| `part_number` | the Part number column in the pricing table |
+| `label` | shown by `--list-trainings`; for the sales manager, never printed to the customer |
+| `description` | printed verbatim in the offer — word it the way it should read |
+| `numbered` | append `#1`, `#2`, … when true |
+
+Numbering runs across the whole selection in the order the trainings are
+passed, which is why `--training install --training adv2w --training adv1w`
+reproduces the example offer's `INSTALL+TRAIN`, `ADV_TRAIN#1` (two weeks),
+`ADV_TRAIN#2` (one week). `--training adv1w:2` adds two of the same type.
+
+### How the rows are replaced
+
+`apply_trainings` finds the pricing table, identifies its existing training
+rows by part number (`INSTALL+TRAIN`, `ADV_TRAIN…`, `TRAIN…`), and swaps them
+for the requested set. The first of those rows is the formatting prototype; the
+last stays in place as the insertion point so the new rows land exactly where
+the old ones were — under NRE, above freight.
+
+Everything else in the pricing table is untouched, and the price column is left
+empty on every row the skill writes. This decides what is *offered*, never what
+it costs.
+
+Passing no `--training` at all leaves the template's own rows alone, which is
+the right result when training has not been discussed.
+
+### Merged cells
+
+The pricing table merges Description across two grid columns, so Word reports
+that cell twice when you iterate `row.cells`. Writing by raw index puts the
+quantity on top of the description. Use `distinct_cells(row)` — it collapses
+merged spans — for any row in that table.
+
 ## Regenerating the template from a new letterhead
 
 When the company letterhead changes, take a real offer that already uses it:
@@ -98,6 +197,11 @@ When the company letterhead changes, take a real offer that already uses it:
 ```bash
 python3 scripts/make_template.py NEW_OFFER.docx -o assets/rfq_template.docx
 ```
+
+The script also lifts the machine photo out of the offer and writes it beside
+the output as `extracted_system_picture.png` — rename it after the system and
+move it into `assets/systems/`, since the photo belongs to the machine being
+quoted rather than to the letterhead.
 
 The script reports which placeholders it found. Anything listed under
 *NOT found in the source* has to be placed by hand — open the template in
@@ -112,8 +216,9 @@ print(re.findall(r'\{\{\w+\}\}', zipfile.ZipFile('assets/rfq_template.docx') \
 Then prove the new template works end to end before anyone quotes from it:
 
 ```bash
-python3 scripts/build_rfq.py SOME_EXPORT.xls -o /tmp/check.docx --customer "Test"
-python3 scripts/check_rfq.py /tmp/check.docx --config SOME_EXPORT.xls
+python3 scripts/build_rfq.py SOME_EXPORT.xls -o /tmp/check.docx --customer "Test" \
+  --training install --training adv2w
+python3 scripts/check_rfq.py /tmp/check.docx --config SOME_EXPORT.xls --expect-picture
 ```
 
 ## If the Configuration table is renamed

@@ -9,21 +9,33 @@ commercial offers.
 produces for a machine build and writes it into the company RFQ letterhead as
 a formatted Configuration table, grouped by module class.
 
-It fills the letterhead fields and the configuration list. It deliberately
-does not touch pricing, service-contract figures or terms — those are
-commercial commitments, so a person completes them in Word before the offer
-is sent.
+It fills the letterhead fields, the configuration list, the system photo and
+the training line items. It deliberately does not touch prices,
+service-contract figures or terms — those are commercial commitments, so a
+person completes them in Word before the offer is sent.
+
+The system photo comes from `assets/systems/`, where the filename is the
+machine name (`Pilot VX.jpg`); the right one is matched from the export and
+scaled to fit the template's layout box. Training line items come from
+`assets/trainings.json` and are numbered `ADV_TRAIN#1`, `#2`, … in the order
+requested.
 
 ```bash
 pip install python-docx openpyxl xlrd
 
-python3 .claude/skills/rfq-from-config/scripts/build_rfq.py CONFIG.xlsx \
+S=.claude/skills/rfq-from-config/scripts
+
+python3 $S/build_rfq.py --list-trainings      # what can be offered
+python3 $S/build_rfq.py --list-systems        # which machine photos exist
+
+python3 $S/build_rfq.py CONFIG.xlsx \
   -o "RFQ_Customer_Machine.docx" \
   --customer "Customer Ltd. / Attn: ..." \
-  --protocol "PRV 000000/V_IL rev.01"
+  --protocol "PRV 000000/V_IL rev.01" \
+  --training install --training adv2w --training adv1w
 
-python3 .claude/skills/rfq-from-config/scripts/check_rfq.py \
-  "RFQ_Customer_Machine.docx" --config CONFIG.xlsx
+python3 $S/check_rfq.py "RFQ_Customer_Machine.docx" \
+  --config CONFIG.xlsx --expect-picture
 ```
 
 Accepts `.xls`, `.xlsx` and `.csv` exports. See the skill's `SKILL.md` for the

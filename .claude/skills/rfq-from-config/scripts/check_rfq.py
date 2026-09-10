@@ -24,7 +24,9 @@ except ImportError:
     sys.exit("python-docx is required:  pip install python-docx")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_rfq import read_config, find_config_table  # noqa: E402
+from build_rfq import (read_config, find_config_table, find_pricing_table,  # noqa: E402
+                       find_picture_anchor, distinct_cells, PICTURE_BOX_IN,
+                       _is_training_row)
 
 
 def collect_doc_rows(table) -> tuple[list[tuple[str, str, str]], list[str]]:
@@ -54,6 +56,8 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("rfq", help="the generated .docx")
     ap.add_argument("--config", help="the configurator export it was built from")
+    ap.add_argument("--expect-picture", action="store_true",
+                    help="treat a missing system picture as a failure")
     args = ap.parse_args(argv)
 
     doc = Document(args.rfq)
@@ -75,9 +79,48 @@ def main(argv=None) -> int:
     else:
         notes.append(f"letterhead images: {header_imgs}")
 
-    for label, table_index in (("Pricing", 5), ("Terms & conditions", 7)):
-        if len(doc.tables) <= table_index:
-            problems.append(f"the {label} table is missing from the document")
+    # --- system picture ----------------------------------------------------
+    anchor = find_picture_anchor(doc)
+    if anchor is None:
+        problems.append("the template's picture anchor paragraph is gone")
+    else:
+        extents = re.findall(r'<wp:extent cx="(\d+)" cy="(\d+)"', anchor._p.xml)
+        if not extents:
+            message = "no system picture in the document"
+            (problems if args.expect_picture else notes).append(message)
+        else:
+            width, height = (int(v) / 914400 for v in extents[0])
+            notes.append(f"system picture: {width:.2f}in x {height:.2f}in")
+            box_w, box_h = PICTURE_BOX_IN
+            # A picture wider or taller than the layout box pushes the page
+            # around, which is exactly what the fit-to-box sizing prevents.
+            if width > box_w + 0.02 or height > box_h + 0.02:
+                problems.append(
+                    f"the picture ({width:.2f} x {height:.2f}in) overflows the "
+                    f"{box_w} x {box_h}in layout box")
+
+    # --- training line items ------------------------------------------------
+    pricing = find_pricing_table(doc)
+    if pricing is None:
+        problems.append("no pricing table found in the document")
+    else:
+        trainings = [distinct_cells(r)[0].text.strip() for r in pricing.rows
+                     if _is_training_row(distinct_cells(r)[0].text)]
+        if trainings:
+            notes.append(f"training rows: {', '.join(trainings)}")
+        if len(set(trainings)) != len(trainings):
+            duplicates = sorted({t for t in trainings if trainings.count(t) > 1})
+            problems.append("duplicate training line(s): " + ", ".join(duplicates))
+        numbers = [int(m.group(1)) for t in trainings
+                   if (m := re.search(r"#(\d+)$", t))]
+        if numbers and numbers != list(range(1, len(numbers) + 1)):
+            problems.append(f"training numbering is not sequential: {numbers}")
+        for row in pricing.rows:
+            cells = distinct_cells(row)
+            if _is_training_row(cells[0].text) and len(cells) > 1 \
+                    and not cells[1].text.strip():
+                problems.append(f"training row {cells[0].text.strip()!r} has no "
+                                f"description")
 
     # --- configuration table ----------------------------------------------
     table = find_config_table(doc)

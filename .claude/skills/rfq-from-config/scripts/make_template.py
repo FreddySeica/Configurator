@@ -19,7 +19,9 @@ from __future__ import annotations
 import argparse
 import copy
 import os
+import re
 import sys
+import zipfile
 
 try:
     from docx import Document
@@ -93,6 +95,32 @@ def main(argv=None) -> int:
                             set_para(cell.paragraphs[idx + 1], ["{{DESCRIPTION_2}}"])
                             done.add("DESCRIPTION_2")
 
+    # --- machine picture ---------------------------------------------------
+    # The photo belongs to the system being quoted, not to the letterhead, so it
+    # comes out of the template and into assets/systems/ where build_rfq.py can
+    # pick the right one per machine. The centred paragraph stays as the anchor.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from build_rfq import find_picture_anchor
+
+    anchor = find_picture_anchor(doc)
+    extracted = None
+    if anchor is not None:
+        rel_ids = re.findall(r'r:embed="(rId\d+)"', anchor._p.xml)
+        for run in list(anchor.runs):
+            if run._r.find(qn("w:drawing")) is not None:
+                run._r.getparent().remove(run._r)
+        if rel_ids:
+            try:
+                part = doc.part.related_parts[rel_ids[0]]
+                suffix = os.path.splitext(part.partname)[1] or ".png"
+                extracted = os.path.join(
+                    os.path.dirname(os.path.abspath(args.output)) or ".",
+                    "extracted_system_picture" + suffix)
+                with open(extracted, "wb") as fh:
+                    fh.write(part.blob)
+            except KeyError:
+                pass
+
     # --- configuration table ----------------------------------------------
     config = None
     for table in doc.tables:
@@ -124,6 +152,12 @@ def main(argv=None) -> int:
         print("  NOT found in the source (fill these by hand): "
               + ", ".join("{{%s}}" % t for t in sorted(missing)))
     print("  configuration table reduced to header + 1 prototype row")
+    if extracted:
+        print(f"  machine picture removed -> {extracted}")
+        print("    rename it after the system (e.g. 'Pilot VX.jpg') and put it in "
+              "assets/systems/")
+    elif anchor is not None:
+        print("  no machine picture found in the source (anchor paragraph kept)")
     return 0
 
 

@@ -33,6 +33,14 @@ except ImportError:
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TEMPLATE = os.path.join(HERE, "..", "assets", "rfq_template.docx")
+DEFAULT_SYSTEMS = os.path.join(HERE, "..", "assets", "systems")
+DEFAULT_TRAININGS = os.path.join(HERE, "..", "assets", "trainings.json")
+
+# The example offer sits the machine render in a 4.91 x 3.93 in box. New photos
+# are fitted inside it rather than forced to its width, so an unusually tall or
+# wide picture cannot push the rest of the page around.
+PICTURE_BOX_IN = (4.91, 3.93)
+PICTURE_SUFFIXES = (".jpg", ".jpeg", ".png")
 
 # Shading used by the template's own header rows - reused so subheadings look native.
 SUBHEAD_FILL = "E0E0E0"
@@ -192,6 +200,242 @@ def read_config(path: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# System picture library
+# --------------------------------------------------------------------------- #
+def _tokens(text: str) -> list[str]:
+    return [t for t in re.split(r"[^0-9a-z]+", text.lower()) if t]
+
+
+def list_systems(directory: str) -> list[str]:
+    """Every picture available, by system name (the filename without extension)."""
+    if not os.path.isdir(directory):
+        return []
+    return sorted(
+        os.path.splitext(f)[0] for f in os.listdir(directory)
+        if os.path.splitext(f)[1].lower() in PICTURE_SUFFIXES and not f.startswith(".")
+    )
+
+
+def resolve_picture(directory: str, wanted: str | None, cfg: dict) -> tuple[str | None, str]:
+    """Pick the picture for this machine. Returns (path or None, explanation).
+
+    The system name is not a field in the export, so it is inferred from the
+    Base-class module code - the machine itself, e.g. VX - and from the
+    configuration title. Matching is deliberately conservative: a wrong machine
+    photo on a quote is worse than no photo, so anything less than a clear
+    single winner is reported back rather than guessed at.
+    """
+    available = list_systems(directory)
+    if not available:
+        return None, f"no pictures in {directory}"
+
+    by_norm = {}
+    for name in available:
+        by_norm.setdefault(re.sub(r"[^0-9a-z]", "", name.lower()), name)
+
+    if wanted:
+        key = re.sub(r"[^0-9a-z]", "", wanted.lower())
+        if key in by_norm:
+            return os.path.join(directory, _picture_file(directory, by_norm[key])), \
+                   f"matched '{wanted}'"
+        near = [n for n in available if key and key in re.sub(r"[^0-9a-z]", "", n.lower())]
+        if len(near) == 1:
+            return os.path.join(directory, _picture_file(directory, near[0])), \
+                   f"'{wanted}' matched '{near[0]}'"
+        return None, (f"'{wanted}' does not match any picture. Available: "
+                      + ", ".join(available))
+
+    # Candidates, strongest signal first: the base machine's module code, then
+    # its description, then the configuration title.
+    base = next((i for i in cfg["items"] if i["class"].lower() == "base"), None)
+    candidates = []
+    if base:
+        candidates.append(base["module"])
+        candidates.append(base["description"])
+    candidates.append(cfg.get("title", ""))
+
+    scored = {}
+    for weight, candidate in enumerate(reversed(candidates)):
+        cand_tokens = set(_tokens(candidate))
+        if not cand_tokens:
+            continue
+        for name in available:
+            name_tokens = set(_tokens(name))
+            if not name_tokens:
+                continue
+            # A module code that appears verbatim as a word in the filename is
+            # the signal that matters: "VX" in "Pilot VX".
+            overlap = cand_tokens & name_tokens
+            distinctive = {t for t in overlap if t not in ("pilot", "seica", "series")}
+            if distinctive:
+                scored[name] = max(scored.get(name, 0), (weight + 1) * 10 + len(distinctive))
+
+    if not scored:
+        return None, ("could not tell which system this is. Available: "
+                      + ", ".join(available))
+    best = max(scored.values())
+    winners = [n for n, v in scored.items() if v == best]
+    if len(winners) > 1:
+        return None, ("several pictures match equally (" + ", ".join(winners)
+                      + "); pass --system to choose")
+    return os.path.join(directory, _picture_file(directory, winners[0])), \
+           f"auto-matched '{winners[0]}'"
+
+
+def _picture_file(directory: str, stem: str) -> str:
+    for suffix in PICTURE_SUFFIXES:
+        if os.path.exists(os.path.join(directory, stem + suffix)):
+            return stem + suffix
+    raise FileNotFoundError(stem)
+
+
+def find_picture_anchor(doc):
+    """The centred paragraph under the description block holds the machine photo."""
+    for table in doc.tables[:6]:
+        for row in table.rows:
+            for cell in row.cells:
+                text = "\n".join(p.text for p in cell.paragraphs)
+                if "{{DESCRIPTION" in text or "Description:" in text:
+                    continue
+                for para in cell.paragraphs:
+                    if para.alignment is not None and int(para.alignment) == 1:
+                        return para
+    return None
+
+
+def insert_picture(doc, path: str) -> tuple[float, float]:
+    """Put the picture in the anchor paragraph, scaled to fit the layout box."""
+    from docx.image.image import Image as DocxImage
+    from docx.shared import Inches
+
+    para = find_picture_anchor(doc)
+    if para is None:
+        raise RuntimeError("the template has no centred paragraph to hold the picture")
+
+    image = DocxImage.from_file(path)
+    box_w, box_h = PICTURE_BOX_IN
+    native_w, native_h = image.width.inches, image.height.inches
+    scale = min(box_w / native_w, box_h / native_h)
+    width, height = native_w * scale, native_h * scale
+
+    for run in list(para.runs):
+        run._r.getparent().remove(run._r)
+    para.add_run().add_picture(path, width=Inches(width), height=Inches(height))
+    return round(width, 2), round(height, 2)
+
+
+# --------------------------------------------------------------------------- #
+# Training line items
+# --------------------------------------------------------------------------- #
+def load_trainings(path: str) -> list[dict]:
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)["catalog"]
+
+
+def parse_training_args(requested: list[str], catalog: list[dict]) -> list[dict]:
+    """Turn --training arguments into the rows to write.
+
+    Accepts a key ("adv1w") or a key with a count ("adv1w:2"). Numbered types
+    are given running numbers across the whole selection, so asking for one
+    2-week and one 1-week training yields ADV_TRAIN#1 and ADV_TRAIN#2 - the
+    ordering a reader expects, and the one the example offer uses.
+    """
+    by_key = {entry["key"]: entry for entry in catalog}
+    chosen, counter = [], 0
+    for item in requested:
+        key, _, count = item.partition(":")
+        key = key.strip()
+        if key not in by_key:
+            sys.exit(f"Unknown training '{key}'. Available: "
+                     + ", ".join(f"{e['key']} ({e['label']})" for e in catalog))
+        try:
+            repeat = int(count) if count else 1
+        except ValueError:
+            sys.exit(f"'{item}': the count after ':' must be a whole number.")
+        if repeat < 1:
+            sys.exit(f"'{item}': the count must be at least 1.")
+        entry = by_key[key]
+        for _ in range(repeat):
+            part = entry["part_number"]
+            if entry.get("numbered"):
+                counter += 1
+                part = f"{part}#{counter}"
+            chosen.append({"part_number": part,
+                           "description": entry["description"],
+                           "quantity": "1"})
+    return chosen
+
+
+def distinct_cells(row) -> list:
+    """The cells of a row, with merged spans collapsed to one entry.
+
+    Word reports a merged cell once per grid column it covers. The pricing
+    table spans Description across two columns, so writing by raw index puts
+    the quantity on top of the description.
+    """
+    out = []
+    for cell in row.cells:
+        if not out or cell._tc is not out[-1]._tc:
+            out.append(cell)
+    return out
+
+
+def find_pricing_table(doc):
+    for table in doc.tables:
+        header = [c.text.strip().lower() for c in table.rows[0].cells]
+        if any(h.startswith("part number") for h in header) and \
+           any(h.startswith("price") for h in header):
+            return table
+    return None
+
+
+def _is_training_row(part_number: str) -> bool:
+    return bool(re.match(r"^(install\+train|adv_train|train)", part_number.strip().lower()))
+
+
+def apply_trainings(doc, rows: list[dict]) -> dict:
+    """Replace the pricing table's training lines with the requested ones.
+
+    Only the training rows are touched. The machine, NRE and freight lines are
+    commercial content that belongs to whoever priced the deal, and the price
+    column is left empty throughout - this decides what is offered, never what
+    it costs.
+    """
+    table = find_pricing_table(doc)
+    if table is None:
+        return {"written": 0, "note": "no pricing table found - trainings skipped"}
+
+    existing = [r for r in table.rows if _is_training_row(r.cells[0].text)]
+    if not existing:
+        return {"written": 0, "note": "no training rows in the template to replace"}
+
+    from docx.table import _Row
+
+    # The last existing training row stays put as the insertion point and is
+    # removed once the new rows are in, so the replacements land exactly where
+    # the old ones were - above the freight line, below NRE.
+    prototype = copy.deepcopy(existing[0]._tr)
+    anchor = existing[-1]._tr
+    for row in existing[:-1]:
+        row._tr.getparent().remove(row._tr)
+
+    written = []
+    for row in rows:
+        tr = copy.deepcopy(prototype)
+        anchor.addprevious(tr)
+        cells = distinct_cells(_Row(tr, table))
+        values = [row["part_number"], row["description"], row["quantity"], ""]
+        for cell, value in zip(cells, values):
+            _set_cell(cell, value)
+        for extra in cells[len(values):]:
+            _set_cell(extra, "")
+        written.append(row["part_number"])
+
+    anchor.getparent().remove(anchor)
+    return {"written": len(written), "part_numbers": written}
+
+
+# --------------------------------------------------------------------------- #
 # Writing into the template
 # --------------------------------------------------------------------------- #
 def fill_placeholders(doc, values: dict) -> list[str]:
@@ -328,7 +572,8 @@ def default_date() -> str:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("config", help="configurator export (.xls/.xlsx/.csv)")
+    ap.add_argument("config", nargs="?",
+                    help="configurator export (.xls/.xlsx/.csv)")
     ap.add_argument("-o", "--output", help="output .docx (default: RFQ_<config title>.docx)")
     ap.add_argument("-t", "--template", default=DEFAULT_TEMPLATE)
     ap.add_argument("--customer", default="", help="fills the 'To:' block")
@@ -339,8 +584,39 @@ def main(argv=None):
     ap.add_argument("--protocol", default="", help="e.g. 'PRV 260230/V_IL rev.01'")
     ap.add_argument("--no-group", action="store_true",
                     help="keep raw export order instead of grouping by Class")
+    ap.add_argument("--system", default=None,
+                    help="system name to pick a picture for, e.g. 'Pilot VX' "
+                         "(default: inferred from the export)")
+    ap.add_argument("--picture", default=None,
+                    help="use this image file directly, ignoring the library")
+    ap.add_argument("--systems-dir", default=DEFAULT_SYSTEMS,
+                    help="directory of system pictures, named <system>.jpg")
+    ap.add_argument("--no-picture", action="store_true",
+                    help="leave the picture space empty")
+    ap.add_argument("--training", action="append", default=[], metavar="KEY[:N]",
+                    help="training line item to offer; repeatable, e.g. "
+                         "--training install --training adv2w --training adv1w:2")
+    ap.add_argument("--trainings-file", default=DEFAULT_TRAININGS)
+    ap.add_argument("--list-trainings", action="store_true",
+                    help="print the training catalogue and exit")
+    ap.add_argument("--list-systems", action="store_true",
+                    help="print the available system pictures and exit")
     ap.add_argument("--json", action="store_true", help="print a machine-readable summary")
     args = ap.parse_args(argv)
+
+    if args.list_trainings:
+        for entry in load_trainings(args.trainings_file):
+            number = " (numbered #1, #2, ...)" if entry.get("numbered") else ""
+            print(f"{entry['key']:10} {entry['part_number']:15} {entry['label']}{number}")
+        return 0
+    if args.list_systems:
+        names = list_systems(args.systems_dir)
+        print("\n".join(names) if names else f"(no pictures in {args.systems_dir})")
+        return 0
+
+    if not args.config:
+        ap.error("a configurator export is required (or use --list-trainings / "
+                 "--list-systems)")
 
     cfg = read_config(args.config)
     doc = Document(args.template)
@@ -359,6 +635,28 @@ def main(argv=None):
 
     stats = build_config_table(find_config_table(doc), cfg["items"], group=not args.no_group)
 
+    # --- system picture ----------------------------------------------------
+    picture = {"status": "skipped"}
+    if not args.no_picture:
+        if args.picture:
+            path, why = args.picture, f"given explicitly ({os.path.basename(args.picture)})"
+            if not os.path.exists(path):
+                sys.exit(f"Picture not found: {path}")
+        else:
+            path, why = resolve_picture(args.systems_dir, args.system, cfg)
+        if path:
+            width, height = insert_picture(doc, path)
+            picture = {"status": "inserted", "file": os.path.basename(path),
+                       "why": why, "size_in": [width, height]}
+        else:
+            picture = {"status": "not inserted", "why": why}
+
+    # --- training line items ----------------------------------------------
+    trainings = {"written": 0, "note": "left as in the template"}
+    if args.training:
+        rows = parse_training_args(args.training, load_trainings(args.trainings_file))
+        trainings = apply_trainings(doc, rows)
+
     out = args.output
     if not out:
         stem = re.sub(r"[^\w\-. ]+", "_", cfg["title"] or "configuration").strip() or "configuration"
@@ -371,6 +669,8 @@ def main(argv=None):
         "item_count": stats["rows"],
         "groups": stats["groups"],
         "unfilled_placeholders": missing,
+        "picture": picture,
+        "trainings": trainings,
     }
     if args.json:
         print(json.dumps(summary, indent=2))
@@ -381,6 +681,16 @@ def main(argv=None):
         if stats["groups"]:
             print("  grouped by class    : "
                   + ", ".join(f"{k} ({n})" for k, n in stats["groups"]))
+        if picture["status"] == "inserted":
+            w, h = picture["size_in"]
+            print(f"  system picture      : {picture['file']} ({picture['why']}), "
+                  f"{w}in x {h}in")
+        elif picture["status"] == "not inserted":
+            print(f"  system picture      : NONE - {picture['why']}")
+        if trainings.get("part_numbers"):
+            print("  trainings offered   : " + ", ".join(trainings["part_numbers"]))
+        elif trainings.get("note"):
+            print(f"  trainings           : {trainings['note']}")
         if missing:
             print("  still to fill in Word: " + ", ".join(missing))
     return 0

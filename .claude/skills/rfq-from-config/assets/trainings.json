@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Training line items offered in the RFQ pricing table.",
+    "Add an entry here to offer a new training type - no code change needed.",
+    "'numbered': true appends #1, #2, #3 ... in the order the trainings are added,",
+    "which is how ADV_TRAIN#1 and ADV_TRAIN#2 appear in a quote.",
+    "'description' is printed verbatim to the customer, so word it the way you",
+    "want it read. Prices are never set here - they are filled in Word."
+  ],
+  "catalog": [
+    {
+      "key": "install",
+      "part_number": "INSTALL+TRAIN",
+      "label": "Installation + basic training - 1 week onsite",
+      "description": "One week onsite of one Seica engineer for machine installation and production start-up Including installation and basic training",
+      "numbered": false
+    },
+    {
+      "key": "adv2w",
+      "part_number": "ADV_TRAIN",
+      "label": "Advanced hardware & programming - 2 weeks onsite",
+      "description": "Two weeks onsite of one Seica engineer for advanced hardware and programming training session",
+      "numbered": true
+    },
+    {
+      "key": "adv1w",
+      "part_number": "ADV_TRAIN",
+      "label": "Advanced hardware & programming - 1 week onsite",
+      "description": "One week onsite of one Seica engineer for advanced hardware and programming training session",
+      "numbered": true
+    }
+  ]
+}
