@@ -138,8 +138,8 @@ nothing else. `.jpg`, `.jpeg` and `.png` all work. Currently stocked:
 ```
 Compact Digital XL   Compact SL SC   Compact TK
 Pilot BT             Pilot BTP       Pilot BTV
-Pilot V8             Pilot VX        Pilot VX AUT
-Valid LR             Valid SL
+Pilot V8             Pilot VX        Valid LR
+Valid SL
 ```
 
 Where a machine has both a plain and an Opera-series photo, the library holds
@@ -149,19 +149,12 @@ of the matching pool so it cannot make a match ambiguous. To use one, pass
 
 Matching compares the Base module code against the words of each filename,
 ignoring product-line words (`pilot`, `seica`, `series`, `opera`). A filename
-with nothing left over wins, so `VX` picks `Pilot VX` rather than the automated
-`Pilot VX AUT`, and `TK` picks `Compact TK`.
+with nothing left over wins, so `VX` picks `Pilot VX` and `TK` picks
+`Compact TK` even if a longer variant name is added to the library later.
 
 It is deliberately conservative: when several pictures fit equally badly — a
 bare `Compact` matches three of them — it inserts nothing and says so. A quote
 carrying a photo of the wrong machine is worse than one carrying no photo.
-
-**`Pilot VX` and `Pilot VX AUT` are different machines**, the second being the
-VX with an automation module. The module code alone cannot tell them apart, so
-when the configuration includes automation (`LUV8M`, `AWAM`, `230V_AUTO` and
-similar Cabinet/sorters modules) the plain VX photo will be picked and may be
-the wrong one. Worth a glance at the Class groups before sending; `--system
-"Pilot VX AUT"` switches it.
 
 When the configurator's code does not resemble the filename, record it once in
 `assets/systems/aliases.json` instead of passing `--system` forever:
@@ -185,6 +178,24 @@ Mech.Tools, Packaging, Other…) becomes a shaded subheading row spanning the
 table. Groups appear in the order they first occur in the export, which keeps
 the base machine at the top where a reader expects it, rather than imposing an
 alphabetical order that would bury it.
+
+**Included rows travel with the module they came with.** The configurator
+lists a chargeable module and then, beneath it, whatever that module brings
+along — rows carrying a quantity in `Incl.` rather than `#.`. Those rows are
+placed under their parent, not under their own Class, because the relationship
+is positional and sorting on Class alone destroys it.
+
+So the twelve included rows under the base machine — `8Z-HEADS-HR`, `ACL`,
+`FNODE`, `STAT`, `VIVA`, `4.0 READY`, `KES`, `M22-16/9TS`, `PAMOC`, `RAIL8MM`,
+`MENTORPACK`, `CAD` — all sit in the **Base** section with the machine, even
+though their own Class says Hardware or Software: they are what is inside the
+machine. Meanwhile `DONGLEPST`, which the export lists under the programming
+station, stays with that station in Programming/Repair Stations.
+
+Get this wrong and the offer tells the customer that the base machine ships
+without the software it includes, and that a dongle is a separate line item.
+`check_rfq.py` fails if an included row is ever left opening a section, since
+that means it lost its parent.
 
 `Other` is where the configurator puts customer-specific line items typed in
 by hand — special power supplies, extra magazines, third-party instruments.

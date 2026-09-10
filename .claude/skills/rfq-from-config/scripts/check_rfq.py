@@ -51,6 +51,31 @@ def collect_doc_rows(table) -> tuple[list[tuple[str, str, str]], list[str]]:
     return items, headings
 
 
+def check_included_rows(table) -> list[str]:
+    """An included row must sit under the charged row it belongs to.
+
+    Included rows say what comes with the module above them, so one landing at
+    the head of a section has been separated from its parent - the customer
+    would read a bundled item as a standalone line, or the base machine as
+    shipping without software it actually includes.
+    """
+    problems, previous_was_heading = [], False
+    for row in table.rows[1:]:
+        distinct = []
+        for cell in row.cells:
+            if not distinct or cell._tc is not distinct[-1]._tc:
+                distinct.append(cell)
+        if len(distinct) == 1:
+            previous_was_heading = True
+            continue
+        qty, incl, module = (c.text.strip() for c in distinct[:3])
+        if previous_was_heading and incl and not qty:
+            problems.append(f"included row {module!r} opens a section - it has "
+                            f"been separated from the module it comes with")
+        previous_was_heading = False
+    return problems
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -128,6 +153,8 @@ def main(argv=None) -> int:
     notes.append(f"configuration rows: {len(doc_items)}")
     if headings:
         notes.append(f"class subheadings: {len(headings)} ({', '.join(headings)})")
+
+    problems.extend(check_included_rows(table))
 
     empty_state = [m for q, i, m, _ in doc_items if not q and not i]
     if empty_state:

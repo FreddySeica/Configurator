@@ -45,6 +45,20 @@ is why the skill does not attempt to price anything.
   `M22-16/9` survive intact.
 - **Rows with no class fall into `Other`**, which is also where the
   configurator puts hand-typed customer-specific items.
+- **An `Incl.` row belongs to the charged row above it.** The export's order
+  carries that meaning, so `attach_included` binds each included row to the
+  preceding charged row and the pair moves through grouping together. The
+  included row is placed by its parent's Class, never its own.
+
+  In the reference export this puts twelve rows — everything from
+  `8Z-HEADS-HR` to `CAD` — in the `Base` section alongside the VX, because they
+  are what the machine includes, while `DONGLEPST` stays beside `PSTDI` under
+  Programming/Repair Stations. Sorting those rows on their own Class instead
+  would tell the customer the machine ships without its own software.
+
+  An included row with no charged row above it becomes its own block rather
+  than being dropped, and `check_rfq.py` reports any included row left opening
+  a section.
 
 ## The RFQ template
 
@@ -143,19 +157,18 @@ filename. Product-line words (`pilot`, `seica`, `series`, `opera`) are dropped,
 so the comparison turns on the part that distinguishes a machine.
 
 A filename whose remaining words are *all* accounted for by the candidate beats
-one that still has words left over. That is what separates `Pilot VX` from
-`Pilot VX AUT` when the code is just `VX`: both match on `vx`, but the second
-leaves `aut` unexplained, so the plain VX wins. Give the code as `VX AUT` and
-the automated machine wins instead, because then nothing is left over on either
+one that still has words left over. If a variant such as `Pilot VX AUT` is ever
+added to the library, the bare code `VX` still resolves to `Pilot VX`: both
+match on `vx`, but the variant leaves `aut` unexplained. Giving the code as
+`VX AUT` picks the variant instead, since then nothing is left over on either
 side and it matches more words.
 
 When nothing is exact the scores stay level and the caller is asked — a bare
 `Compact` fits `Compact TK`, `Compact SL SC` and `Compact Digital XL` equally
 badly, and picking one would be a guess.
 
-Note that the module code cannot distinguish a machine from its automated
-variant on its own. If the configurator does not spell that out, record it in
-`aliases.json` or pass `--system`.
+A module code cannot distinguish a machine from a variant the code does not
+name. Where that matters, record it in `aliases.json` or pass `--system`.
 
 Matching is intentionally strict. If nothing matches, or two pictures match
 equally well, the script inserts nothing and says why. A quote carrying a photo

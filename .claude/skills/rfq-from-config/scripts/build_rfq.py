@@ -545,6 +545,35 @@ def _shade(cell, fill: str):
     cell._tc.get_or_add_tcPr().append(shd)
 
 
+def attach_included(items: list[dict]) -> list[dict]:
+    """Bind each included row to the charged row it came with.
+
+    The configurator lists a chargeable module and then, beneath it, whatever
+    that module brings with it - rows carrying a quantity in `Incl.` rather than
+    `#.`. So the twelve included rows under the base machine are what is inside
+    the machine, while DONGLEPST further down is what comes with the
+    programming station, not with the machine.
+
+    That relationship is positional and would be lost by sorting the rows on
+    their own Class: the customer would read that a dongle for the programming
+    station is a separate Programming/Repair Stations line item, and that the
+    base machine ships without the software it actually includes. Keeping each
+    included row with its parent is what the hand-written offers do.
+
+    Returns one block per charged row: {"lead": item, "included": [items]}.
+    """
+    blocks: list[dict] = []
+    for item in items:
+        is_included = bool(item["incl"]) and not item["qty"]
+        if is_included and blocks:
+            blocks[-1]["included"].append(item)
+        else:
+            # A leading orphan - an included row with nothing above it - becomes
+            # its own block so it is still shown rather than silently dropped.
+            blocks.append({"lead": item, "included": []})
+    return blocks
+
+
 def build_config_table(table, items: list[dict], group: bool = True) -> dict:
     """Rebuild the configuration table from the export rows.
 
@@ -579,22 +608,29 @@ def build_config_table(table, items: list[dict], group: bool = True) -> dict:
             add_item(item)
         return {"groups": [], "rows": len(items)}
 
-    # Preserve the configurator's own ordering: a class appears where it first
-    # appears in the export, so the machine's base unit stays at the top.
+    # Group by the Class of the charged row; anything it includes travels with
+    # it. Preserve the configurator's own ordering, so a class appears where it
+    # first appears in the export and the base machine stays at the top.
     order, buckets = [], {}
-    for item in items:
-        key = item["class"]
+    for block in attach_included(items):
+        key = block["lead"]["class"]
         if key not in buckets:
             buckets[key] = []
             order.append(key)
-        buckets[key].append(item)
+        buckets[key].append(block)
 
+    counts = {}
     for key in order:
         add_subheading(key)
-        for item in buckets[key]:
-            add_item(item)
+        counts[key] = 0
+        for block in buckets[key]:
+            add_item(block["lead"])
+            counts[key] += 1
+            for included in block["included"]:
+                add_item(included)
+                counts[key] += 1
 
-    return {"groups": [(k, len(buckets[k])) for k in order], "rows": len(items)}
+    return {"groups": [(k, counts[k]) for k in order], "rows": len(items)}
 
 
 def ordinal(day: int) -> str:
