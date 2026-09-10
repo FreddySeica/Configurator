@@ -23,6 +23,10 @@ Valid LR, Valid SL — with other views in `alternates/` and
 `assets/trainings.json` and are numbered `ADV_TRAIN#1`, `#2`, … in the order
 requested.
 
+Colours and typeface come from `assets/theme.json`. The values shipped today
+were sampled from the letterhead artwork, not from a design system — swap that
+one file to adopt the real tokens. `--no-theme` builds without them.
+
 ```bash
 pip install python-docx openpyxl xlrd
 

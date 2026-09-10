@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "Design tokens applied to the RFQ document.",
+    "",
+    "PROVENANCE: these values were sampled from the Seica artwork already in the",
+    "letterhead - the wordmark, the OPERA badge and the footer rules - because the",
+    "Seica Israel design system in Claude Design could not be reached from the",
+    "session that built this. They are on-brand by construction but they are NOT",
+    "the design system's own tokens.",
+    "",
+    "To adopt the real design system, change the values below and nothing else.",
+    "Every rule that consumes them lives in scripts/apply_theme.py.",
+    "",
+    "Colours are Word-style RRGGBB hex with no leading '#'."
+  ],
+  "source": "sampled from letterhead artwork; replace with Seica Israel design system tokens",
+
+  "font": {
+    "body": "Calibri",
+    "heading": "Calibri"
+  },
+
+  "color": {
+    "brand_dark": "001860",
+    "brand": "3084D8",
+    "brand_light": "6CA8CC",
+    "neutral": "B4B4B4",
+    "heading_text": "001860",
+    "on_brand": "FFFFFF"
+  },
+
+  "table": {
+    "header_fill": "001860",
+    "header_text": "FFFFFF",
+    "subheading_fill": "3084D8",
+    "subheading_text": "FFFFFF"
+  }
+}

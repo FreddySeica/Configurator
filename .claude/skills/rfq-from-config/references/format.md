@@ -242,6 +242,55 @@ that cell twice when you iterate `row.cells`. Writing by raw index puts the
 quantity on top of the description. Use `distinct_cells(row)` — it collapses
 merged spans — for any row in that table.
 
+## Design tokens
+
+`assets/theme.json` is the single source of visual values; `apply_theme.py`
+reads it and nothing else hard-codes a colour. To adopt a design system, change
+the values and leave the script alone.
+
+```json
+"color":  { "brand_dark": "001860", "brand": "3084D8",
+            "brand_light": "6CA8CC", "neutral": "B4B4B4",
+            "heading_text": "001860", "on_brand": "FFFFFF" },
+"table":  { "header_fill": "001860", "header_text": "FFFFFF",
+            "subheading_fill": "3084D8", "subheading_text": "FFFFFF" }
+```
+
+Colours are Word-style `RRGGBB` with no leading `#`. The `source` field records
+where the values came from; keep it honest, since it is printed on every build.
+
+### Provenance of the shipped values
+
+They were sampled from the letterhead artwork embedded in the template, not
+taken from a design system. The Seica Israel design system lives in Claude
+Design at project `16f0a237-5659-4ebf-a4ae-27ee0a19f8ee`, which needs an
+authorization that a remote session cannot obtain: `DesignSync` reports that
+`/design-login` must be run once from an interactive Claude Code session, or
+the project seeded into the workspace via "Send to Claude Code Web". A plain
+fetch of the share link returns 403. Until one of those happens, the tokens
+here are a stand-in.
+
+### What gets restyled
+
+| Element | Token |
+|---|---|
+| all body text | `font.body` (family only — sizes untouched) |
+| section headings | `color.heading_text`, `font.heading` |
+| table header rows | `table.header_fill`, `table.header_text` |
+| class subheadings | `table.subheading_fill`, `table.subheading_text` |
+
+Header rows are found by their column titles (`HEADER_SIGNATURES`), scanning
+the first three rows rather than only the first — the spare-parts appendix
+opens with a merged title and puts its column names underneath.
+
+Class subheadings are restyled **only inside the Configuration table**. Treating
+every merged row as a subheading also catches the pricing table's `TOTAL SYSTEM
+PRICE` line and the spare-parts title, which mean something else and carry their
+own emphasis.
+
+Never restyled: page headers and footers (fixed logo artwork), and the
+spare-parts data shading (colour there is information, not decoration).
+
 ## Regenerating the template from a new letterhead
 
 When the company letterhead changes, take a real offer that already uses it:

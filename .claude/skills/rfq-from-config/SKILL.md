@@ -171,6 +171,36 @@ Pictures are scaled to fit inside the template's 4.91 × 3.93 in box without
 distortion, so a wide or tall photo comes out smaller rather than shoving the
 page around.
 
+## Design tokens
+
+`assets/theme.json` holds the colours and typeface applied to the finished
+document, and `scripts/apply_theme.py` is the only place that consumes them.
+Adopting a different design system is an edit to the JSON, not to code.
+
+**The tokens currently shipped are not a design system.** They were sampled
+from the Seica artwork already in the letterhead — the wordmark, the OPERA
+badge, the footer rules — because the Seica Israel design system in Claude
+Design could not be reached from the session that built this. They are on-brand
+by construction and nothing more. If the user asks about styling, say where the
+values came from rather than implying they are authoritative.
+
+Two things are deliberately never restyled, and both are worth defending if
+asked to "theme everything":
+
+* **The letterhead.** Page headers and footers are fixed logo artwork.
+  Restyling type over the top of it is how a letterhead stops lining up.
+* **Data shading.** The spare-parts appendix uses colour to mean something.
+  Recolouring those cells to match a palette erases the meaning while looking
+  tidier.
+
+What does change: the body typeface, section headings, table header rows, and
+the Configuration table's class subheadings. Font *sizes* are left alone —
+the subject line is larger than the body on purpose, and flattening every size
+to one value would destroy the hierarchy while claiming to be a restyle.
+
+`--no-theme` builds with the template's own styling. A missing theme file is
+not an error; the build simply goes unthemed.
+
 ## Working with the Class grouping
 
 The export's Class column (Base, Hardware, Software, PC/Peripherals,
@@ -228,6 +258,8 @@ will happily split those tokens across runs if they are retyped.
 - `assets/rfq_template.docx` — letterhead, empty Configuration table, pricing
   and terms boilerplate
 - `assets/trainings.json` — the training catalogue
+- `assets/theme.json` — design tokens (colours, typeface)
+- `scripts/apply_theme.py` — applies those tokens to a finished document
 - `assets/systems/` — one picture per machine, filename = system name;
   `aliases.json` for module codes that do not resemble it, `alternates/` for
   other views

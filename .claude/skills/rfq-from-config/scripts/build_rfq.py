@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TEMPLATE = os.path.join(HERE, "..", "assets", "rfq_template.docx")
 DEFAULT_SYSTEMS = os.path.join(HERE, "..", "assets", "systems")
 DEFAULT_TRAININGS = os.path.join(HERE, "..", "assets", "trainings.json")
+DEFAULT_THEME = os.path.join(HERE, "..", "assets", "theme.json")
 
 # The example offer sits the machine render in a 4.91 x 3.93 in box. New photos
 # are fitted inside it rather than forced to its width, so an unusually tall or
@@ -673,6 +674,10 @@ def main(argv=None):
                     help="training line item to offer; repeatable, e.g. "
                          "--training install --training adv2w --training adv1w:2")
     ap.add_argument("--trainings-file", default=DEFAULT_TRAININGS)
+    ap.add_argument("--theme", default=DEFAULT_THEME,
+                    help="design tokens applied to the finished document")
+    ap.add_argument("--no-theme", action="store_true",
+                    help="leave the template's own styling untouched")
     ap.add_argument("--list-trainings", action="store_true",
                     help="print the training catalogue and exit")
     ap.add_argument("--list-systems", action="store_true",
@@ -733,6 +738,17 @@ def main(argv=None):
         rows = parse_training_args(args.training, load_trainings(args.trainings_file))
         trainings = apply_trainings(doc, rows)
 
+    # --- design tokens ------------------------------------------------------
+    theming = {"applied": False, "note": "not applied"}
+    if not args.no_theme and os.path.exists(args.theme):
+        from apply_theme import apply_theme, load_theme
+        tokens = load_theme(args.theme)
+        counts = apply_theme(doc, tokens)
+        theming = {"applied": True, "source": tokens.get("source", "unspecified"),
+                   **counts}
+    elif not args.no_theme:
+        theming = {"applied": False, "note": f"no theme file at {args.theme}"}
+
     out = args.output
     if not out:
         stem = re.sub(r"[^\w\-. ]+", "_", cfg["title"] or "configuration").strip() or "configuration"
@@ -747,6 +763,7 @@ def main(argv=None):
         "unfilled_placeholders": missing,
         "picture": picture,
         "trainings": trainings,
+        "theme": theming,
     }
     if args.json:
         print(json.dumps(summary, indent=2))
@@ -767,6 +784,11 @@ def main(argv=None):
             print("  trainings offered   : " + ", ".join(trainings["part_numbers"]))
         elif trainings.get("note"):
             print(f"  trainings           : {trainings['note']}")
+        if theming["applied"]:
+            print(f"  theme               : {theming['headings']} headings, "
+                  f"{theming['header_rows']} table headers, "
+                  f"{theming['subheadings']} class subheadings")
+            print(f"    tokens from       : {theming['source']}")
         if missing:
             print("  still to fill in Word: " + ", ".join(missing))
     return 0
