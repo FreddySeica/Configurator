@@ -23,9 +23,10 @@ Valid LR, Valid SL — with other views in `alternates/` and
 `assets/trainings.json` and are numbered `ADV_TRAIN#1`, `#2`, … in the order
 requested.
 
-Colours and typeface come from `assets/theme.json`. The values shipped today
-were sampled from the letterhead artwork, not from a design system — swap that
-one file to adopt the real tokens. `--no-theme` builds without them.
+Colours and typeface come from `assets/theme.json`, and those values are now
+the Seica Israel design system's own — navy `1A2B5A`, brand cyan `00AEEF`, the
+`0082B5` blue the system reserves for small text on white, on Arial. Adopting a
+different system is an edit to that one file. `--no-theme` builds without them.
 
 ```bash
 pip install python-docx openpyxl xlrd

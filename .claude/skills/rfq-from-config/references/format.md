@@ -249,11 +249,12 @@ reads it and nothing else hard-codes a colour. To adopt a design system, change
 the values and leave the script alone.
 
 ```json
-"color":  { "brand_dark": "001860", "brand": "3084D8",
-            "brand_light": "6CA8CC", "neutral": "B4B4B4",
-            "heading_text": "001860", "on_brand": "FFFFFF" },
-"table":  { "header_fill": "001860", "header_text": "FFFFFF",
-            "subheading_fill": "3084D8", "subheading_text": "FFFFFF" }
+"font":   { "body": "Arial", "heading": "Arial" },
+"color":  { "brand_dark": "1A2B5A", "brand": "00AEEF",
+            "brand_light": "22D3FF", "neutral": "D9E1EC",
+            "heading_text": "0082B5", "on_brand": "FFFFFF" },
+"table":  { "header_fill": "1A2B5A", "header_text": "FFFFFF",
+            "subheading_fill": "EAF2FA", "subheading_text": "1A2B5A" }
 ```
 
 Colours are Word-style `RRGGBB` with no leading `#`. The `source` field records
@@ -261,14 +262,40 @@ where the values came from; keep it honest, since it is printed on every build.
 
 ### Provenance of the shipped values
 
-They were sampled from the letterhead artwork embedded in the template, not
-taken from a design system. The Seica Israel design system lives in Claude
-Design at project `16f0a237-5659-4ebf-a4ae-27ee0a19f8ee`, which needs an
-authorization that a remote session cannot obtain: `DesignSync` reports that
-`/design-login` must be run once from an interactive Claude Code session, or
-the project seeded into the workspace via "Send to Claude Code Web". A plain
-fetch of the share link returns 403. Until one of those happens, the tokens
-here are a stand-in.
+They are the Seica Israel design system's own tokens, read from that system's
+`colors_and_type.css` (Claude Design project
+`16f0a237-5659-4ebf-a4ae-27ee0a19f8ee`) and converted from CSS custom
+properties to Word-style hex:
+
+| theme.json | design system token | value |
+|---|---|---|
+| `color.brand_dark`, `table.header_fill` | `--seica-navy` | `1A2B5A` |
+| `color.brand` | `--seica-blue` | `00AEEF` |
+| `color.brand_light` | `--accent-cyan` | `22D3FF` |
+| `color.heading_text` | `--seica-blue-deep` | `0082B5` |
+| `color.neutral` | `--line` | `D9E1EC` |
+| `table.subheading_fill` | `--bg-panel` | `EAF2FA` |
+| `table.subheading_text` | `--seica-navy` | `1A2B5A` |
+
+Two places where the mapping is a judgement rather than a lookup, both
+recorded in `theme.json`'s `_comment` so they survive the next edit:
+
+**Arial, not Barlow.** The system records Arial as the sole brand font and
+introduces Barlow / Barlow Condensed only as display faces for roll-ups and
+posters, where the file is rendered to print by the designer. A `.docx` is
+rendered by whoever opens it; a font that is not installed substitutes without
+warning, and a half-Barlow offer looks worse than an all-Arial one.
+
+**`0082B5` for section headings, not `00AEEF`.** The system points section
+headers at the brand cyan, which works at poster scale on dark grounds. At
+11–14pt on white it falls below readable contrast, and the system already
+supplies `--seica-blue-deep` for exactly this case: small text on white.
+
+**`EAF2FA` panel for class subheadings, not a filled cyan band.** The system's
+surface rules are hairlines and light blue-tinted panels, with dark bands
+reserved for hero and header blocks. The Configuration table already has one
+dark band — the navy header row — so the class subheadings sit on the panel
+tint with navy text, which also keeps them legible in greyscale print.
 
 ### What gets restyled
 

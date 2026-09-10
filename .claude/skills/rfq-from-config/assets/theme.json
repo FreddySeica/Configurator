@@ -2,37 +2,53 @@
   "_comment": [
     "Design tokens applied to the RFQ document.",
     "",
-    "PROVENANCE: these values were sampled from the Seica artwork already in the",
-    "letterhead - the wordmark, the OPERA badge and the footer rules - because the",
-    "Seica Israel design system in Claude Design could not be reached from the",
-    "session that built this. They are on-brand by construction but they are NOT",
-    "the design system's own tokens.",
+    "PROVENANCE: these values come from the Seica Israel design system",
+    "(Claude Design project 16f0a237-5659-4ebf-a4ae-27ee0a19f8ee), file",
+    "colors_and_type.css. They are the design system's own tokens, translated",
+    "from CSS custom properties to Word-style RRGGBB hex.",
     "",
-    "To adopt the real design system, change the values below and nothing else.",
-    "Every rule that consumes them lives in scripts/apply_theme.py.",
+    "Mapping, token by token:",
+    "  --seica-navy      #1A2B5A  -> brand_dark, heading rules, table header fill",
+    "  --seica-blue      #00AEEF  -> brand (the exact brand cyan)",
+    "  --seica-blue-deep #0082B5  -> heading_text; the design system reserves this",
+    "                               variant for small text on white, and a section",
+    "                               heading set in #00AEEF on paper is unreadable",
+    "  --bg-panel        #EAF2FA  -> class subheading fill, with navy text; the",
+    "                               system calls for hairlines and light panels",
+    "                               rather than heavy colour chrome",
+    "  --line            #D9E1EC  -> neutral",
+    "",
+    "FONT: the design system records Arial as the sole brand font (confirmed",
+    "against SEICA_Israel_Template_EN.docx). Barlow / Barlow Condensed appear in",
+    "the system only as display faces for large-format collateral - roll-ups and",
+    "posters - and are not used here: an RFQ is a Word document that opens on a",
+    "customer's machine, where a font that is not installed silently substitutes.",
+    "",
+    "To adopt different values, change them below and nothing else. Every rule",
+    "that consumes them lives in scripts/apply_theme.py.",
     "",
     "Colours are Word-style RRGGBB hex with no leading '#'."
   ],
-  "source": "sampled from letterhead artwork; replace with Seica Israel design system tokens",
+  "source": "Seica Israel design system (Claude Design 16f0a237-5659-4ebf-a4ae-27ee0a19f8ee), colors_and_type.css",
 
   "font": {
-    "body": "Calibri",
-    "heading": "Calibri"
+    "body": "Arial",
+    "heading": "Arial"
   },
 
   "color": {
-    "brand_dark": "001860",
-    "brand": "3084D8",
-    "brand_light": "6CA8CC",
-    "neutral": "B4B4B4",
-    "heading_text": "001860",
+    "brand_dark": "1A2B5A",
+    "brand": "00AEEF",
+    "brand_light": "22D3FF",
+    "neutral": "D9E1EC",
+    "heading_text": "0082B5",
     "on_brand": "FFFFFF"
   },
 
   "table": {
-    "header_fill": "001860",
+    "header_fill": "1A2B5A",
     "header_text": "FFFFFF",
-    "subheading_fill": "3084D8",
-    "subheading_text": "FFFFFF"
+    "subheading_fill": "EAF2FA",
+    "subheading_text": "1A2B5A"
   }
 }

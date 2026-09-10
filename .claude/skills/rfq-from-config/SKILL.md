@@ -177,12 +177,22 @@ page around.
 document, and `scripts/apply_theme.py` is the only place that consumes them.
 Adopting a different design system is an edit to the JSON, not to code.
 
-**The tokens currently shipped are not a design system.** They were sampled
-from the Seica artwork already in the letterhead — the wordmark, the OPERA
-badge, the footer rules — because the Seica Israel design system in Claude
-Design could not be reached from the session that built this. They are on-brand
-by construction and nothing more. If the user asks about styling, say where the
-values came from rather than implying they are authoritative.
+**The tokens shipped today are the Seica Israel design system's own.** They
+were taken from that system's `colors_and_type.css` — navy `1A2B5A`, brand cyan
+`00AEEF`, the `0082B5` blue the system reserves for small text on white, and the
+`EAF2FA` panel tint — and translated to Word-style hex. Earlier builds used
+values sampled from the letterhead artwork as a stand-in; those are gone.
+
+Two deviations, both deliberate and both worth stating if asked:
+
+* **Arial, not Barlow.** The system names Arial as the sole brand font and
+  offers Barlow / Barlow Condensed only as display faces for large-format
+  print. An RFQ opens on a customer's machine, where an uninstalled font
+  substitutes silently, so the document stays on Arial.
+* **Section headings use `0082B5`, not `00AEEF`.** The system points section
+  headers at the brand cyan, but cyan at heading size on white paper is not
+  legible; `--seica-blue-deep` is the variant the system itself provides for
+  small text on white.
 
 Two things are deliberately never restyled, and both are worth defending if
 asked to "theme everything":
