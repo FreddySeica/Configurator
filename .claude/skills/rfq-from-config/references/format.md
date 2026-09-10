@@ -139,8 +139,23 @@ how much they can be trusted:
 3. the configuration title
 
 Each candidate is split into words and compared against the words of every
-filename. Generic words (`pilot`, `seica`, `series`) are ignored, so the match
-turns on the distinctive part: `VX` picks `Pilot VX` and not `Pilot V8`.
+filename. Product-line words (`pilot`, `seica`, `series`, `opera`) are dropped,
+so the comparison turns on the part that distinguishes a machine.
+
+A filename whose remaining words are *all* accounted for by the candidate beats
+one that still has words left over. That is what separates `Pilot VX` from
+`Pilot VX AUT` when the code is just `VX`: both match on `vx`, but the second
+leaves `aut` unexplained, so the plain VX wins. Give the code as `VX AUT` and
+the automated machine wins instead, because then nothing is left over on either
+side and it matches more words.
+
+When nothing is exact the scores stay level and the caller is asked — a bare
+`Compact` fits `Compact TK`, `Compact SL SC` and `Compact Digital XL` equally
+badly, and picking one would be a guess.
+
+Note that the module code cannot distinguish a machine from its automated
+variant on its own. If the configurator does not spell that out, record it in
+`aliases.json` or pass `--system`.
 
 Matching is intentionally strict. If nothing matches, or two pictures match
 equally well, the script inserts nothing and says why. A quote carrying a photo

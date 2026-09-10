@@ -283,21 +283,32 @@ def resolve_picture(directory: str, wanted: str | None, cfg: dict) -> tuple[str 
         candidates.append(base["description"])
     candidates.append(cfg.get("title", ""))
 
+    # Words that name the product line rather than the machine. Ignoring them
+    # keeps the comparison on the part that actually distinguishes a system.
+    generic = {"pilot", "seica", "series", "opera"}
+
     scored = {}
     for weight, candidate in enumerate(reversed(candidates)):
         cand_tokens = set(_tokens(candidate))
         if not cand_tokens:
             continue
         for name in available:
-            name_tokens = set(_tokens(name))
+            name_tokens = {t for t in _tokens(name) if t not in generic}
             if not name_tokens:
                 continue
-            # A module code that appears verbatim as a word in the filename is
-            # the signal that matters: "VX" in "Pilot VX".
-            overlap = cand_tokens & name_tokens
-            distinctive = {t for t in overlap if t not in ("pilot", "seica", "series")}
-            if distinctive:
-                scored[name] = max(scored.get(name, 0), (weight + 1) * 10 + len(distinctive))
+            matched = cand_tokens & name_tokens
+            if not matched:
+                continue
+            # A filename with no words left over is describing this machine and
+            # not a variant of it: for the code "VX", "Pilot VX" is exact while
+            # "Pilot VX AUT" still has "aut" unaccounted for, so the plain VX
+            # wins. When nothing is exact the scores stay level and the caller
+            # is asked, which is what should happen for a bare "Compact" that
+            # fits three different machines equally badly.
+            exact = name_tokens <= cand_tokens
+            score = (weight + 1, int(exact), len(matched))
+            if score > scored.get(name, (0, 0, 0)):
+                scored[name] = score
 
     if not scored:
         return None, ("could not tell which system this is. Available: "

@@ -137,19 +137,31 @@ nothing else. `.jpg`, `.jpeg` and `.png` all work. Currently stocked:
 
 ```
 Compact Digital XL   Compact SL SC   Compact TK
-Pilot VX             Valid LR        Valid SL
+Pilot BT             Pilot BTP       Pilot BTV
+Pilot V8             Pilot VX        Pilot VX AUT
+Valid LR             Valid SL
 ```
 
 Where a machine has both a plain and an Opera-series photo, the library holds
-the Opera one; the other views live in `assets/systems/alternates/`, which is
-out of the matching pool so it cannot make a match ambiguous. To use one, pass
-`--picture "assets/systems/alternates/VALID-LR-02.jpg"`.
+the Opera one; other views live in `assets/systems/alternates/`, which is out
+of the matching pool so it cannot make a match ambiguous. To use one, pass
+`--picture "assets/systems/alternates/Pilot VX (CAD render).png"`.
 
-Matching looks for the Base module code as a whole word in the filename, so
-`VX` finds `Pilot VX` and `TK` finds `Compact TK`. It is deliberately
-conservative: when several pictures match equally well — a bare `Compact` fits
-three of them — it inserts nothing and says so. A quote carrying a photo of the
-wrong machine is worse than one carrying no photo at all.
+Matching compares the Base module code against the words of each filename,
+ignoring product-line words (`pilot`, `seica`, `series`, `opera`). A filename
+with nothing left over wins, so `VX` picks `Pilot VX` rather than the automated
+`Pilot VX AUT`, and `TK` picks `Compact TK`.
+
+It is deliberately conservative: when several pictures fit equally badly — a
+bare `Compact` matches three of them — it inserts nothing and says so. A quote
+carrying a photo of the wrong machine is worse than one carrying no photo.
+
+**`Pilot VX` and `Pilot VX AUT` are different machines**, the second being the
+VX with an automation module. The module code alone cannot tell them apart, so
+when the configuration includes automation (`LUV8M`, `AWAM`, `230V_AUTO` and
+similar Cabinet/sorters modules) the plain VX photo will be picked and may be
+the wrong one. Worth a glance at the Class groups before sending; `--system
+"Pilot VX AUT"` switches it.
 
 When the configurator's code does not resemble the filename, record it once in
 `assets/systems/aliases.json` instead of passing `--system` forever:
