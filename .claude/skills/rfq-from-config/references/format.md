@@ -72,7 +72,7 @@ than rebuilt from scratch.
 
 | # | Table | Skill writes it? |
 |---|---|---|
-| 0 | `To:` block | yes — `{{CUSTOMER}}` |
+| 0 | `To:` block | no` |
 | 1 | Protocol number / Date | yes — `{{PROTOCOL}}`, `{{DATE}}` |
 | 2 | Subject | yes — `{{SUBJECT}}` |
 | 3 | Description lines | yes — `{{DESCRIPTION_1}}`, `{{DESCRIPTION_2}}` |
