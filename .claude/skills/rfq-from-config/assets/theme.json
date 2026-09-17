@@ -1,38 +1,52 @@
 {
   "_comment": [
-    "Design tokens applied to the RFQ document.",
+    "The Seica Israel design system, as embodied in assets/rfq_template.docx.",
     "",
-    "PROVENANCE: these values were sampled from the Seica artwork already in the",
-    "letterhead - the wordmark, the OPERA badge and the footer rules - because the",
-    "Seica Israel design system in Claude Design could not be reached from the",
-    "session that built this. They are on-brand by construction but they are NOT",
-    "the design system's own tokens.",
+    "The template IS the design system's output, so generated rows inherit their",
+    "styling by being cloned from it - nothing here needs to be applied for an",
+    "offer to look right. These values are recorded so the palette is readable",
+    "without opening Word, and so scripts/apply_theme.py can re-assert them over",
+    "a template that has drifted.",
     "",
-    "To adopt the real design system, change the values below and nothing else.",
-    "Every rule that consumes them lives in scripts/apply_theme.py.",
+    "'placeholder' is load-bearing rather than decorative: the design writes",
+    "unfilled values in that slate and real content in the default near-black,",
+    "so build_rfq.py drops it from anything it fills in.",
     "",
     "Colours are Word-style RRGGBB hex with no leading '#'."
   ],
-  "source": "sampled from letterhead artwork; replace with Seica Israel design system tokens",
+  "source": "Seica Israel design system (assets/rfq_template.docx)",
 
   "font": {
-    "body": "Calibri",
-    "heading": "Calibri"
+    "body": "Arial",
+    "heading": "Arial"
+  },
+
+  "size_pt": {
+    "title": 20,
+    "subtitle": 11.5,
+    "section_heading": 14,
+    "sub_heading": 11.5,
+    "body": 10.5,
+    "table": 9.5,
+    "fine_print": 8.5
   },
 
   "color": {
-    "brand_dark": "001860",
-    "brand": "3084D8",
-    "brand_light": "6CA8CC",
-    "neutral": "B4B4B4",
-    "heading_text": "001860",
+    "brand_dark": "1A2B5A",
+    "brand": "0082B5",
+    "brand_light": "EAF2FA",
+    "neutral": "5B6A82",
+    "heading_text": "0082B5",
+    "body_text": "0B1220",
+    "muted_text": "29364D",
+    "placeholder": "5B6A82",
     "on_brand": "FFFFFF"
   },
 
   "table": {
-    "header_fill": "001860",
+    "header_fill": "1A2B5A",
     "header_text": "FFFFFF",
-    "subheading_fill": "3084D8",
-    "subheading_text": "FFFFFF"
+    "subheading_fill": "EAF2FA",
+    "subheading_text": "1A2B5A"
   }
 }

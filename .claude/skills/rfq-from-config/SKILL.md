@@ -1,26 +1,35 @@
 ---
 name: rfq-from-config
-description: Turn a machine-configurator export (.xlsx/.xls/.csv listing modules with #., Incl., Module, Description, Class columns) into a customer-ready RFQ / commercial-offer Word document on the company letterhead template, including the system photo and the training line items. Use this whenever the user mentions building a quote, an RFQ, a commercial offer, a customer proposal, or "sending a configuration to a customer" — and also whenever they hand over a configurator or config export and ask to put it into a template, into the RFQ, into Word, or "make it ready to send". Trigger even if they only say something like "here's the config for Valid, prep the offer" without naming the template or the file format.
+description: Turn a machine-configurator export (.xlsx/.xls/.csv listing modules with #., Incl., Module, Description, Class columns) into a customer-ready RFQ / commercial offer on the SEICA Israel Word template, filling the Configuration table, the "What the configuration includes" summary, the letterhead and the system photo. Use this whenever the user mentions building a quote, an RFQ, a commercial offer, a customer proposal, or "sending a configuration to a customer" — and also whenever they hand over a configurator or config export and ask to put it into a template, into the offer, into Word, or "make it ready to send". Trigger even if they only say something like "here's the config for Valid, prep the offer" without naming the template or the file format.
 ---
 
 # RFQ from configurator export
 
-A sales manager configures a machine in the configurator tool, exports the
-result as a spreadsheet, and needs to send the customer a formal offer. Doing
-that by hand means pasting 50–70 rows into Word and repairing the formatting
-every time. This skill does the paste, and deliberately stops short of the
-commercial decisions.
+A sales manager configures a machine in the configurator tool, exports a
+spreadsheet, and needs a formal offer to send. Doing that by hand means pasting
+50–70 rows into Word and repairing the formatting every time. This skill does
+the paste, and deliberately stops short of the commercial decisions.
 
-**What the skill fills in:** the `To:` block, protocol number, date, subject,
-description lines, the Configuration table (grouped by Class), the system
-photo, and the training line items in the Pricing table.
+**What the skill fills:** the title and its one-line summary, the To / Attn. /
+Protocol no. / Date block, the system photo, the **Configuration** table, the
+**What the configuration includes** summary, and the training lines in Pricing.
 
-**What the skill leaves alone — on purpose:** every price, the NRE and freight
-lines, Service Contract Options, Terms & conditions, and the spare-parts
-appendix. Prices, delivery dates and payment terms are commitments to a
-customer; a wrong number there is far more costly than a missing one, so a
-person fills those in Word before sending. Say so when handing back the file
-rather than leaving the user to discover it.
+**What it leaves for a person — on purpose:** every price, the part numbers in
+the Pricing table, freight and incoterms, service-contract figures, and the
+blanks in Terms & Conditions. Prices and delivery terms are commitments to a
+customer; a wrong number there costs far more than a missing one. Say so when
+handing the file back rather than letting the user discover it.
+
+## The placeholder convention
+
+The template writes anything still to be filled in a lighter slate
+(`5B6A82`) and real content in the default near-black. That colour is
+load-bearing: it is how someone scanning the offer sees what is still owed.
+
+So everything the skill writes is promoted out of that slate, and everything it
+deliberately does not fill keeps it. A finished build therefore shows grey
+exactly where a person still has work to do — most visibly every `[ 0,00 ]` in
+the Pricing table. Do not "tidy up" leftover brackets; they are the worklist.
 
 ## Workflow
 
@@ -30,237 +39,138 @@ rather than leaving the user to discover it.
 python3 scripts/build_rfq.py CONFIG.xlsx --json -o /tmp/probe.docx
 ```
 
-The summary reports the configuration title, the module count, the Class
-groups, and which system picture was matched. Knowing the machine is a Pilot VX
-with 56 modules lets you propose a sensible subject line instead of asking the
-user to invent one, which is the difference between one question and four.
+The summary reports the configuration title, module count, Class groups, which
+system picture matched, and how many capability lines it will write. Knowing
+the machine is a Pilot VX with 56 modules lets you propose a title instead of
+asking the user to invent one — the difference between one question and four.
 
 Dependencies, if the script complains: `pip install python-docx openpyxl xlrd`
 (`xlrd` only matters for the older `.xls` exports).
 
-### 2. Ask for what the export cannot tell you — in one round
+### 2. Ask once, for what the spreadsheet cannot say
 
-Three things are genuinely unknowable from the spreadsheet. Ask them together,
-not one at a time, and skip any the user already gave you.
+**The customer** — never inferable. Always ask, along with the `Attn.` contact.
 
-**The customer.** Never inferable. Always ask.
-
-**The trainings.** The export says nothing about them, and the number varies
-per deal. Show the catalogue and ask how many of each:
+**The trainings** — the export says nothing about them and the count varies per
+deal. Show the catalogue and ask in plain terms ("installation week plus how
+many advanced training weeks?"):
 
 ```bash
 python3 scripts/build_rfq.py --list-trainings
 ```
 
-```
-install    INSTALL+TRAIN   Installation + basic training - 1 week onsite
-adv2w      ADV_TRAIN       Advanced hardware & programming - 2 weeks onsite
-adv1w      ADV_TRAIN       Advanced hardware & programming - 1 week onsite
-```
+Then translate the answer into `--training` flags. Advanced trainings are
+numbered `ADV_TRAIN#1`, `#2`, … in the order passed, so pass the longer sessions
+first if the user lists them that way. Omitting `--training` entirely leaves the
+template's own placeholder row, which is right when training has not come up.
 
-Ask it the way a colleague would — "installation week plus how many advanced
-training weeks?" — rather than making the user learn the keys. Then translate
-their answer into `--training` flags. Advanced trainings get numbered
-`ADV_TRAIN#1`, `#2`, `#3`… automatically in the order you pass them, so pass
-the longer sessions first if the user lists them that way.
+**The picture, only if the match is unsure.** The script infers the machine from
+the Base module code and reports what it picked; if it says `NONE`, show
+`--list-systems` and ask.
 
-**The system picture, but only if the match is unsure.** The script infers the
-machine from the Base-class module code and reports what it picked. If it says
-`NONE`, show the user what is available and ask:
+Everything else gets a proposed default rather than a question: today's date,
+the configuration title as the solution name, and a blank protocol number for
+the user to type in Word.
 
-```bash
-python3 scripts/build_rfq.py --list-systems
-```
-
-For everything else, propose a default rather than asking:
-
-| Field | Sensible default |
-|---|---|
-| `--date` | today, already formatted as `September 10th, 2026` |
-| `--subject` | `Offer for <machine> as per your requirements` |
-| `--description` | the configuration title from the export |
-| `--protocol` | ask, or leave blank for the user to type in Word |
-
-### 3. Build the document
+### 3. Build
 
 ```bash
 python3 scripts/build_rfq.py CONFIG.xlsx \
-  -o "RFQ_<Customer>_<Machine>.docx" \
-  --customer "Valid Ltd. / Attn: Mr. Cohen" \
+  -o "Offer_<Customer>_<Machine>.docx" \
+  --customer "Valid Ltd." --attention "Mr. Cohen" \
   --protocol "PRV 260230/V_IL rev.01" \
-  --subject "Offer for Custom Functional Test Solution as per your requirements" \
-  --description "Functional Flying Probe Test Solution: Pilot VX (Opera) | Vertical double sided Flying Probe Tester" \
+  --description "Flying Probe Test Solution: Pilot VX | Dual-side functional and in-circuit test for vertical double-sided boards" \
   --training install --training adv2w --training adv1w
 ```
 
-`--description` splits on ` | ` across the template's two description lines.
-`--training KEY:N` adds N of the same type (`--training adv1w:2`). Other flags
-worth knowing: `--system "Pilot VX"` to override the picture match, `--picture
-PATH` for a one-off image outside the library, `--no-picture` to leave the space
-empty, and `--no-group` to keep the raw export order instead of grouping by
-Class.
+`--description` splits on ` | ` into the title and the line under it.
+`--training KEY:N` adds N of one type. `--system` overrides the picture match,
+`--picture PATH` uses a file outside the library, `--no-picture` omits it, and
+`--no-group` keeps raw export order instead of grouping by Class.
 
-Omitting `--training` entirely leaves whatever the template already has, which
-is the right behaviour when the user has not mentioned training at all.
+Name the output after the customer and machine. `Offer_Valid_PilotVX.docx` is
+findable six months later; the default, derived from the export title, is not.
 
-Name the output after the customer and machine. `RFQ_Valid_PilotVX.docx` is
-findable six months later; `RFQ_Maors Config - - Test configuration.docx`
-(the default, derived from the export title) is not.
-
-### 4. Check the result before handing it over
-
-The script reports its own row count, but it cannot tell whether the numbers
-are *right*.
+### 4. Check before handing it over
 
 ```bash
 python3 scripts/check_rfq.py OUT.docx --config CONFIG.xlsx --expect-picture
 ```
 
-This compares every module code and quantity against the export and fails
-loudly on a mismatch, an unfilled `{{TOKEN}}`, a lost letterhead, a picture
-that overflows its layout box, a duplicated training line, or training numbers
-that skip. A silent mis-paste is the failure mode that actually reaches
-customers, so run it rather than eyeballing the row count. Drop
-`--expect-picture` if the offer is deliberately going out without a photo.
+This compares every module code and quantity against the export and fails on a
+mismatch, a lost letterhead, a photo that overflows its box, a duplicated or
+misnumbered training line, or an included row separated from its parent. It
+also lists the placeholders still awaiting a person, which is the handover note
+you want. A silent mis-paste is the failure that actually reaches customers, so
+run it rather than eyeballing the table.
 
-### 5. Hand back the file and say what is still open
+### 5. Hand back and say what is open
 
-Deliver the `.docx` and state plainly which sections still need the user: every
-price in the Pricing table, service-contract figures, and the protocol number
-if it was left blank. Do not describe the offer as ready to send.
+Deliver the `.docx` and name what still needs the user: the prices, the part
+numbers in Pricing, freight and incoterm, the service-contract figures, and the
+blanks in Terms. Do not describe the offer as ready to send.
+
+## Included modules travel with their parent
+
+The configurator lists a chargeable module and then, beneath it, whatever that
+module brings along — rows with a quantity under `Incl.` rather than `#.`. That
+relationship is positional, so those rows are placed under their parent and take
+the parent's Class, never their own.
+
+The twelve included rows under the base machine therefore sit in the **Base**
+section with it, even though their own Class says Hardware or Software: they are
+what is inside the machine. `DONGLEPST`, listed under the programming station,
+stays with that station instead. Get this wrong and the offer tells the customer
+the machine ships without the software it includes.
+
+`Other` is where the configurator puts hand-typed customer-specific lines
+(`two PCW11TOW`, `One Doungle`). Pass them through as written; tidy the wording
+only if asked, and never drop a row you do not recognise. A row with neither
+`#.` nor `Incl.` filled, or with both, is usually a configurator glitch — worth
+mentioning before the offer goes out.
+
+## What the configuration includes
+
+The summary takes one line per **quoted capability**: charged (`#.`) modules
+whose Class is Base, Hardware, Software, Boundary scan, Matrix, Open fix, Power
+Supply or Cabinet/sorters. Included rows are skipped — they are inside the lines
+above them — and so are Packaging, PC/Peripherals, Mech.Tools and Programming
+stations, because a wooden box and a keyboard earn a place in the table but not
+in a list of what the machine can do. That filter is `CAPABILITY_CLASSES` in
+`build_rfq.py`; widen it there if the user wants more.
 
 ## The system picture
 
-`assets/systems/` holds one image per machine, named after the system. The
-filename *is* the system name, so adding a machine means dropping a file in and
-nothing else. `.jpg`, `.jpeg` and `.png` all work. Currently stocked:
+`assets/systems/` holds one image per machine, named after the system — the
+filename *is* the system name, so adding a machine means dropping a file in:
 
 ```
-Compact Digital XL   Compact SL SC   Compact TK
-Pilot BT             Pilot BTP       Pilot BTV
-Pilot V8             Pilot VX        Valid LR
-Valid SL
+Compact Digital XL   Compact SL SC   Compact TK   Pilot BT
+Pilot BTP            Pilot BTV       Pilot V8     Pilot VX
+Valid LR             Valid SL
 ```
 
-Where a machine has both a plain and an Opera-series photo, the library holds
-the Opera one; other views live in `assets/systems/alternates/`, which is out
-of the matching pool so it cannot make a match ambiguous. To use one, pass
-`--picture "assets/systems/alternates/Pilot VX (CAD render).png"`.
+Other views live in `assets/systems/alternates/`, outside the matching pool so
+they cannot make a match ambiguous; reach one with `--picture`.
 
 Matching compares the Base module code against the words of each filename,
-ignoring product-line words (`pilot`, `seica`, `series`, `opera`). A filename
-with nothing left over wins, so `VX` picks `Pilot VX` and `TK` picks
-`Compact TK` even if a longer variant name is added to the library later.
+ignoring product-line words (`pilot`, `seica`, `series`, `opera`), and prefers a
+filename with nothing left over. When several fit equally badly — a bare
+`Compact` matches three — it inserts nothing and says so, because a photo of the
+wrong machine is worse than no photo. Record a stubborn code once in
+`assets/systems/aliases.json` rather than passing `--system` forever.
 
-It is deliberately conservative: when several pictures fit equally badly — a
-bare `Compact` matches three of them — it inserts nothing and says so. A quote
-carrying a photo of the wrong machine is worse than one carrying no photo.
-
-When the configurator's code does not resemble the filename, record it once in
-`assets/systems/aliases.json` instead of passing `--system` forever:
-
-```json
-"aliases": { "TK": "Compact TK", "VALID-LR": "Valid LR" }
-```
-
-That file starts empty. If a build reports `NONE` for the picture and the user
-tells you which machine it is, offer to add the alias — it is the difference
-between fixing it once and answering the same question every quote.
-
-Pictures are scaled to fit inside the template's 4.91 × 3.93 in box without
-distortion, so a wide or tall photo comes out smaller rather than shoving the
-page around.
-
-## Design tokens
-
-`assets/theme.json` holds the colours and typeface applied to the finished
-document, and `scripts/apply_theme.py` is the only place that consumes them.
-Adopting a different design system is an edit to the JSON, not to code.
-
-**The tokens currently shipped are not a design system.** They were sampled
-from the Seica artwork already in the letterhead — the wordmark, the OPERA
-badge, the footer rules — because the Seica Israel design system in Claude
-Design could not be reached from the session that built this. They are on-brand
-by construction and nothing more. If the user asks about styling, say where the
-values came from rather than implying they are authoritative.
-
-Two things are deliberately never restyled, and both are worth defending if
-asked to "theme everything":
-
-* **The letterhead.** Page headers and footers are fixed logo artwork.
-  Restyling type over the top of it is how a letterhead stops lining up.
-* **Data shading.** The spare-parts appendix uses colour to mean something.
-  Recolouring those cells to match a palette erases the meaning while looking
-  tidier.
-
-What does change: the body typeface, section headings, table header rows, and
-the Configuration table's class subheadings. Font *sizes* are left alone —
-the subject line is larger than the body on purpose, and flattening every size
-to one value would destroy the hierarchy while claiming to be a restyle.
-
-`--no-theme` builds with the template's own styling. A missing theme file is
-not an error; the build simply goes unthemed.
-
-## Working with the Class grouping
-
-The export's Class column (Base, Hardware, Software, PC/Peripherals,
-Mech.Tools, Packaging, Other…) becomes a shaded subheading row spanning the
-table. Groups appear in the order they first occur in the export, which keeps
-the base machine at the top where a reader expects it, rather than imposing an
-alphabetical order that would bury it.
-
-**Included rows travel with the module they came with.** The configurator
-lists a chargeable module and then, beneath it, whatever that module brings
-along — rows carrying a quantity in `Incl.` rather than `#.`. Those rows are
-placed under their parent, not under their own Class, because the relationship
-is positional and sorting on Class alone destroys it.
-
-So the twelve included rows under the base machine — `8Z-HEADS-HR`, `ACL`,
-`FNODE`, `STAT`, `VIVA`, `4.0 READY`, `KES`, `M22-16/9TS`, `PAMOC`, `RAIL8MM`,
-`MENTORPACK`, `CAD` — all sit in the **Base** section with the machine, even
-though their own Class says Hardware or Software: they are what is inside the
-machine. Meanwhile `DONGLEPST`, which the export lists under the programming
-station, stays with that station in Programming/Repair Stations.
-
-Get this wrong and the offer tells the customer that the base machine ships
-without the software it includes, and that a dongle is a separate line item.
-`check_rfq.py` fails if an included row is ever left opening a section, since
-that means it lost its parent.
-
-`Other` is where the configurator puts customer-specific line items typed in
-by hand — special power supplies, extra magazines, third-party instruments.
-These often have informal module codes (`two PCW11TOW`, `One Doungle`). They
-are legitimate quote lines, so pass them through as written; tidy the wording
-only if the user asks, and never silently drop a row you do not recognise.
-
-If a row has neither `#.` nor `Incl.` filled, or has both, that is usually a
-configurator glitch. Mention it — it is cheap to check before the offer goes
-out and awkward afterwards.
-
-## When the template, catalogue or export changes
-
-Both files are read by content, not by fixed positions: the script finds the
-export header by looking for `Module` + `Description`, and finds the tables by
-their header text. An added column or a shifted row will not break it.
-
-Adding a training type is a data edit — a new entry in `assets/trainings.json`,
-no code change. `references/format.md` covers that, the picture library, and
-how to re-derive the template from a newer company letterhead. Read it before
-editing `assets/rfq_template.docx` by hand — the template carries single-run
-`{{TOKEN}}` placeholders and prototype rows that the script clones, and Word
-will happily split those tokens across runs if they are retyped.
+This design ships no picture frame, so the skill **creates** one: a centred
+paragraph under the title block, with the photo fitted inside 3.60 × 2.60 in so
+it stays subordinate to the offer and cannot push the letterhead down the page.
 
 ## Files
 
-- `scripts/build_rfq.py` — parse export, fill template, write the RFQ
-- `scripts/check_rfq.py` — verify the output against the export
-- `scripts/make_template.py` — re-derive the template from a new letterhead
-- `assets/rfq_template.docx` — letterhead, empty Configuration table, pricing
-  and terms boilerplate
+- `scripts/build_rfq.py` — parse the export, fill the template, write the offer
+- `scripts/check_rfq.py` — verify the result against the export
+- `scripts/apply_theme.py` — re-assert design tokens over a drifted template
+- `assets/rfq_template.docx` — the SEICA Israel commercial-offer template
 - `assets/trainings.json` — the training catalogue
-- `assets/theme.json` — design tokens (colours, typeface)
-- `scripts/apply_theme.py` — applies those tokens to a finished document
-- `assets/systems/` — one picture per machine, filename = system name;
-  `aliases.json` for module codes that do not resemble it, `alternates/` for
-  other views
+- `assets/theme.json` — the design system's tokens, for reference
+- `assets/systems/` — machine photos, `aliases.json`, `alternates/`
 - `references/format.md` — export layout, template anatomy, catalogue format

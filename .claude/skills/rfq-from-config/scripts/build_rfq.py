@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """Turn a machine-configurator export (.xls/.xlsx/.csv) into a customer-ready RFQ .docx.
 
-The configurator writes one row per module. This script reads those rows, groups
-them by their Class column, and rebuilds the "Configuration" table inside the
-company RFQ template so the result can be sent to the customer as-is.
+The configurator writes one row per module. This script reads those rows and
+fills the SEICA Israel commercial-offer template: the Configuration table
+grouped by Class, the "What the configuration includes" capability summary, the
+letterhead block, the system photo, and the training lines in Pricing.
 
-Everything the script does not understand it leaves alone: the pricing table,
-terms, service options and spare-parts appendix all come through from the
-template untouched, because those are commercial decisions a person makes.
+Everything else it leaves alone. Prices, part numbers, freight terms and
+service-contract figures are commitments a person makes, and the template marks
+them with a placeholder colour that this script is careful not to overwrite -
+so a built offer shows at a glance what still needs a human.
 
 Usage:
-    python3 build_rfq.py CONFIG_EXPORT [-o OUT.docx] [--customer "..."] [--date ...]
-                         [--subject "..."] [--description "..."] [--protocol "..."]
-                         [--template PATH] [--no-group] [--json]
+    python3 build_rfq.py CONFIG_EXPORT [-o OUT.docx] [--customer "..."]
+                         [--attention "..."] [--protocol "..."] [--date ...]
+                         [--description "Title | one-line summary"]
+                         [--training KEY[:N]] [--system NAME] [--no-group] [--json]
 """
 from __future__ import annotations
 
@@ -37,14 +40,12 @@ DEFAULT_SYSTEMS = os.path.join(HERE, "..", "assets", "systems")
 DEFAULT_TRAININGS = os.path.join(HERE, "..", "assets", "trainings.json")
 DEFAULT_THEME = os.path.join(HERE, "..", "assets", "theme.json")
 
-# The example offer sits the machine render in a 4.91 x 3.93 in box. New photos
-# are fitted inside it rather than forced to its width, so an unusually tall or
-# wide picture cannot push the rest of the page around.
-PICTURE_BOX_IN = (4.91, 3.93)
+# The photo sits under the title on an A4 page with a 7.09 in text column.
+# Half the column keeps it clearly subordinate to the offer itself, and fitting
+# inside the box rather than forcing a width means an unusually tall or wide
+# photo cannot push the letterhead down the page.
+PICTURE_BOX_IN = (3.60, 2.60)
 PICTURE_SUFFIXES = (".jpg", ".jpeg", ".png")
-
-# Shading used by the template's own header rows - reused so subheadings look native.
-SUBHEAD_FILL = "E0E0E0"
 
 # Column headers the configurator emits. Matching is case/punctuation-insensitive.
 COLUMN_ALIASES = {
@@ -330,41 +331,6 @@ def _picture_file(directory: str, stem: str) -> str:
     raise FileNotFoundError(stem)
 
 
-def find_picture_anchor(doc):
-    """The centred paragraph under the description block holds the machine photo."""
-    for table in doc.tables[:6]:
-        for row in table.rows:
-            for cell in row.cells:
-                text = "\n".join(p.text for p in cell.paragraphs)
-                if "{{DESCRIPTION" in text or "Description:" in text:
-                    continue
-                for para in cell.paragraphs:
-                    if para.alignment is not None and int(para.alignment) == 1:
-                        return para
-    return None
-
-
-def insert_picture(doc, path: str) -> tuple[float, float]:
-    """Put the picture in the anchor paragraph, scaled to fit the layout box."""
-    from docx.image.image import Image as DocxImage
-    from docx.shared import Inches
-
-    para = find_picture_anchor(doc)
-    if para is None:
-        raise RuntimeError("the template has no centred paragraph to hold the picture")
-
-    image = DocxImage.from_file(path)
-    box_w, box_h = PICTURE_BOX_IN
-    native_w, native_h = image.width.inches, image.height.inches
-    scale = min(box_w / native_w, box_h / native_h)
-    width, height = native_w * scale, native_h * scale
-
-    for run in list(para.runs):
-        run._r.getparent().remove(run._r)
-    para.add_run().add_picture(path, width=Inches(width), height=Inches(height))
-    return round(width, 2), round(height, 2)
-
-
 # --------------------------------------------------------------------------- #
 # Training line items
 # --------------------------------------------------------------------------- #
@@ -407,31 +373,18 @@ def parse_training_args(requested: list[str], catalog: list[dict]) -> list[dict]
     return chosen
 
 
-def distinct_cells(row) -> list:
-    """The cells of a row, with merged spans collapsed to one entry.
+def _is_training_row(part_number: str, description: str = "") -> bool:
+    """Whether a pricing row is a training line.
 
-    Word reports a merged cell once per grid column it covers. The pricing
-    table spans Description across two columns, so writing by raw index puts
-    the quantity on top of the description.
+    A filled offer names them by part number (INSTALL+TRAIN, ADV_TRAIN#1). A
+    blank template has not been given codes yet and identifies them by what the
+    line is for, so both are accepted and a template stays usable before anyone
+    has decided on numbering.
     """
-    out = []
-    for cell in row.cells:
-        if not out or cell._tc is not out[-1]._tc:
-            out.append(cell)
-    return out
-
-
-def find_pricing_table(doc):
-    for table in doc.tables:
-        header = [c.text.strip().lower() for c in table.rows[0].cells]
-        if any(h.startswith("part number") for h in header) and \
-           any(h.startswith("price") for h in header):
-            return table
-    return None
-
-
-def _is_training_row(part_number: str) -> bool:
-    return bool(re.match(r"^(install\+train|adv_train|train)", part_number.strip().lower()))
+    if re.match(r"^(install\+train|adv_train|train)", part_number.strip().lower()):
+        return True
+    text = description.strip().lower()
+    return bool(re.search(r"\btraining\b|installation and production start-up", text))
 
 
 def apply_trainings(doc, rows: list[dict]) -> dict:
@@ -446,7 +399,12 @@ def apply_trainings(doc, rows: list[dict]) -> dict:
     if table is None:
         return {"written": 0, "note": "no pricing table found - trainings skipped"}
 
-    existing = [r for r in table.rows if _is_training_row(r.cells[0].text)]
+    def row_is_training(row):
+        cells = distinct_cells(row)
+        return _is_training_row(cells[0].text,
+                                cells[1].text if len(cells) > 1 else "")
+
+    existing = [r for r in table.rows if row_is_training(r)]
     if not existing:
         return {"written": 0, "note": "no training rows in the template to replace"}
 
@@ -465,11 +423,13 @@ def apply_trainings(doc, rows: list[dict]) -> dict:
         tr = copy.deepcopy(prototype)
         anchor.addprevious(tr)
         cells = distinct_cells(_Row(tr, table))
-        values = [row["part_number"], row["description"], row["quantity"], ""]
-        for cell, value in zip(cells, values):
-            _set_cell(cell, value)
-        for extra in cells[len(values):]:
-            _set_cell(extra, "")
+        # Part number, description and quantity only. Whatever the prototype
+        # row holds in the price column stays - in a blank template that is the
+        # "[ 0,00 ]" placeholder, and blanking it would hide the fact that a
+        # price is still owed on this line.
+        for cell, value in zip(cells, [row["part_number"], row["description"],
+                                       row["quantity"]]):
+            set_cell(cell, value)
         written.append(row["part_number"])
 
     anchor.getparent().remove(anchor)
@@ -479,40 +439,95 @@ def apply_trainings(doc, rows: list[dict]) -> dict:
 # --------------------------------------------------------------------------- #
 # Writing into the template
 # --------------------------------------------------------------------------- #
-def fill_placeholders(doc, values: dict) -> list[str]:
-    """Replace {{TOKEN}} runs. Returns the tokens still left unfilled.
+# The design system writes unfilled placeholders in a lighter slate than body
+# text: "[ Code ]", "__ days from PO", "Recommended spare parts for ______" all
+# carry it, while the service and terms tables - which ship already written -
+# carry no colour at all and inherit the near-black default. The colour is
+# therefore load-bearing: it tells a reader what still needs filling in.
+PLACEHOLDER_COLOR = "5B6A82"
 
-    The template keeps each token inside a single run, so swapping the run text
-    preserves the letterhead's fonts and spacing exactly.
+
+def _promote_from_placeholder(run) -> None:
+    """Let a filled-in run take the body colour instead of the placeholder one.
+
+    Only the placeholder slate is cleared. Any other colour on the run was a
+    deliberate choice by whoever designed the template - a navy label, a white
+    header - and is left alone.
     """
-    filled, remaining = set(), set()
-    for para in _all_paragraphs(doc):
-        for run in para.runs:
-            found = re.findall(r"\{\{(\w+)\}\}", run.text)
-            if not found:
-                continue
-            for token in found:
-                value = values.get(token)
-                if value is None:
-                    remaining.add(token)
-                else:
-                    run.text = run.text.replace("{{%s}}" % token, value)
-                    filled.add(token)
-    return sorted(remaining - filled)
+    rPr = run._r.find(qn("w:rPr"))
+    if rPr is None:
+        return
+    for color in rPr.findall(qn("w:color")):
+        if (color.get(qn("w:val")) or "").upper() == PLACEHOLDER_COLOR:
+            rPr.remove(color)
+
+
+def set_text(paragraph, text: str, promote: bool = True) -> None:
+    """Put `text` into a paragraph, keeping the first run's formatting.
+
+    The template's placeholders are split across runs - Word breaks "[ Code ]"
+    into "[ " and "Code ]" as it is typed and spell-checked - so a search and
+    replace over run text misses them. Rewriting the paragraph from its first
+    run sidesteps that entirely and keeps the design system's font and size.
+
+    `promote` then drops the placeholder colour, because what is being written
+    is real content. Without it a finished offer still reads as a form with
+    blanks in it, which is worse than wrong - it looks unfinished to a customer.
+    """
+    runs = paragraph.runs
+    if not runs:
+        paragraph.add_run(text)
+        return
+    runs[0].text = text
+    for run in runs[1:]:
+        run._r.getparent().remove(run._r)
+    if promote and text:
+        _promote_from_placeholder(runs[0])
+
+
+def set_cell(cell, text: str, prototype=None, promote: bool = True) -> None:
+    """Write text into a table cell, keeping its styling.
+
+    Some letterhead value cells ship empty, with no run to inherit from. When
+    that happens a run is cloned from `prototype` - the one cell that does have
+    styled placeholder text - so a filled value looks like the design intended
+    rather than falling back to Word's defaults.
+    """
+    for extra in cell.paragraphs[1:]:
+        extra._p.getparent().remove(extra._p)
+    paragraph = cell.paragraphs[0]
+    if not paragraph.runs and prototype is not None:
+        paragraph._p.append(copy.deepcopy(prototype))
+        for node in paragraph.runs[0]._r.findall(qn("w:t")):
+            paragraph.runs[0]._r.remove(node)
+    set_text(paragraph, text, promote=promote)
 
 
 def _all_paragraphs(doc):
     yield from doc.paragraphs
     for table in doc.tables:
         for row in table.rows:
+            seen = set()
             for cell in row.cells:
+                if id(cell._tc) in seen:
+                    continue
+                seen.add(id(cell._tc))
                 yield from cell.paragraphs
 
 
+def distinct_cells(row) -> list:
+    """Row cells with merged spans collapsed to a single entry."""
+    out = []
+    for cell in row.cells:
+        if not out or cell._tc is not out[-1]._tc:
+            out.append(cell)
+    return out
+
+
 def find_config_table(doc):
-    """The configuration table is the one whose header names the module column."""
+    """The table whose header row names the module column."""
     for table in doc.tables:
-        header = [c.text.strip().lower() for c in table.rows[0].cells]
+        header = [c.text.strip().lower() for c in distinct_cells(table.rows[0])]
         if "module" in header and "description" in header:
             return table
     sys.exit(
@@ -521,45 +536,110 @@ def find_config_table(doc):
     )
 
 
-def _set_cell(cell, text: str, bold: bool | None = None):
-    """Write text into a cell, keeping the prototype run's font."""
-    for extra in cell.paragraphs[1:]:
-        extra._p.getparent().remove(extra._p)
-    para = cell.paragraphs[0]
-    runs = para.runs
-    if not runs:
-        para.add_run(text)
-    else:
-        runs[0].text = text
-        for run in runs[1:]:
-            run._r.getparent().remove(run._r)
-    if bold is not None:
-        for run in para.runs:
-            run.bold = bold
+def find_pricing_table(doc):
+    for table in doc.tables:
+        header = [c.text.strip().lower() for c in distinct_cells(table.rows[0])]
+        if any(h.startswith("part number") for h in header) and \
+           any(h.startswith("price") for h in header):
+            return table
+    return None
 
 
-def _shade(cell, fill: str):
-    shd = OxmlElement("w:shd")
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), fill)
-    cell._tc.get_or_add_tcPr().append(shd)
+# --------------------------------------------------------------------------- #
+# Letterhead and title
+# --------------------------------------------------------------------------- #
+LETTERHEAD_LABELS = {
+    "to": "customer",
+    "attn.": "attention",
+    "attn": "attention",
+    "protocol no.": "protocol",
+    "protocol number": "protocol",
+    "date": "date",
+}
 
 
+def fill_letterhead(doc, values: dict) -> list[str]:
+    """Fill the To / Attn. / Protocol no. / Date block.
+
+    The cells are found by their printed label rather than by position, so the
+    block can be rearranged in Word without breaking this.
+    """
+    filled = []
+    table = None
+    for candidate in doc.tables:
+        labels = {c.text.strip().lower() for r in candidate.rows
+                  for c in distinct_cells(r)}
+        if "to" in labels and "date" in labels:
+            table = candidate
+            break
+    if table is None:
+        return filled
+
+    prototype = None
+    for row in table.rows:
+        for cell in distinct_cells(row):
+            if cell.paragraphs and cell.paragraphs[0].runs and \
+                    "[" in cell.text:
+                prototype = copy.deepcopy(cell.paragraphs[0].runs[0]._r)
+                break
+        if prototype is not None:
+            break
+
+    for row in table.rows:
+        cells = distinct_cells(row)
+        for index, cell in enumerate(cells):
+            key = LETTERHEAD_LABELS.get(cell.text.strip().lower())
+            if key is None or index + 1 >= len(cells):
+                continue
+            value = values.get(key)
+            if value:
+                set_cell(cells[index + 1], value, prototype)
+                filled.append(key)
+    return filled
+
+
+def fill_title(doc, solution: str, summary: str) -> None:
+    """The first two non-empty body paragraphs are the title and its one-liner."""
+    leading = [p for p in doc.paragraphs if p.text.strip()][:2]
+    if leading and solution:
+        set_text(leading[0], solution)
+    if len(leading) > 1 and summary:
+        set_text(leading[1], summary)
+
+
+def strip_author_notes(doc) -> int:
+    """Remove the template's instructions to whoever is filling it in.
+
+    Lines like "Duplicate a class row and its items for each further group"
+    are addressed to the person authoring an offer, not to the customer
+    receiving one, and they read as a mistake in a document that has been sent.
+    """
+    removed = 0
+    for paragraph in list(doc.paragraphs):
+        text = paragraph.text.strip().lower()
+        if text.startswith(("duplicate a class row",
+                            "the capability summary the customer reads")):
+            paragraph._p.getparent().remove(paragraph._p)
+            removed += 1
+    return removed
+
+
+# --------------------------------------------------------------------------- #
+# The Configuration table
+# --------------------------------------------------------------------------- #
 def attach_included(items: list[dict]) -> list[dict]:
     """Bind each included row to the charged row it came with.
 
     The configurator lists a chargeable module and then, beneath it, whatever
     that module brings with it - rows carrying a quantity in `Incl.` rather than
-    `#.`. So the twelve included rows under the base machine are what is inside
-    the machine, while DONGLEPST further down is what comes with the
-    programming station, not with the machine.
+    `#.`. So the rows under the base machine are what is inside the machine,
+    while a dongle further down belongs to the programming station, not to the
+    machine.
 
     That relationship is positional and would be lost by sorting the rows on
     their own Class: the customer would read that a dongle for the programming
-    station is a separate Programming/Repair Stations line item, and that the
-    base machine ships without the software it actually includes. Keeping each
-    included row with its parent is what the hand-written offers do.
+    station is a separate line item, and that the base machine ships without
+    the software it actually includes.
 
     Returns one block per charged row: {"lead": item, "included": [items]}.
     """
@@ -576,42 +656,55 @@ def attach_included(items: list[dict]) -> list[dict]:
 
 
 def build_config_table(table, items: list[dict], group: bool = True) -> dict:
-    """Rebuild the configuration table from the export rows.
+    """Rebuild the Configuration table from the export.
 
-    Row 1 of the template is a blank prototype: cloning it for every line keeps
-    the borders, cell widths and font that the template already defines, which
-    is far more reliable than trying to re-declare that formatting here.
+    The template ships three example rows that double as prototypes: a shaded
+    class row, a charged line with a quantity under "#.", and an included line
+    with its quantity under "Incl.". Cloning those keeps the design system's
+    shading, borders and type without this code restating any of it.
     """
-    prototype = copy.deepcopy(table.rows[1]._tr)
-    body = table._tbl
+    rows = table.rows
+    class_proto = charged_proto = included_proto = None
+    for row in rows[1:]:
+        cells = distinct_cells(row)
+        if len(cells) == 1:
+            if class_proto is None:
+                class_proto = copy.deepcopy(row._tr)
+        elif len(cells) >= 2:
+            if cells[0].text.strip() and charged_proto is None:
+                charged_proto = copy.deepcopy(row._tr)
+            elif cells[1].text.strip() and included_proto is None:
+                included_proto = copy.deepcopy(row._tr)
+    if charged_proto is None:
+        sys.exit("The Configuration table has no example item row to copy.")
+    if included_proto is None:
+        included_proto = charged_proto
+    if class_proto is None:
+        class_proto = charged_proto
 
-    for row in list(table.rows)[1:]:
+    body = table._tbl
+    for row in list(rows)[1:]:
         body.remove(row._tr)
 
-    def new_row():
+    from docx.table import _Row
+
+    def add(prototype, values):
         tr = copy.deepcopy(prototype)
         body.append(tr)
-        return table.rows[-1]
+        cells = distinct_cells(_Row(tr, table))
+        for cell, value in zip(cells, values):
+            set_cell(cell, value)
+        return cells
 
     def add_item(item):
-        cells = new_row().cells
-        for cell, key in zip(cells, ("qty", "incl", "module", "description")):
-            _set_cell(cell, item[key] if key != "description" else item["description"])
-
-    def add_subheading(label):
-        row = new_row()
-        merged = row.cells[0].merge(row.cells[len(row.cells) - 1])
-        _set_cell(merged, label, bold=True)
-        _shade(merged, SUBHEAD_FILL)
+        add(charged_proto if item["qty"] else included_proto,
+            [item["qty"], item["incl"], item["module"], item["description"]])
 
     if not group:
         for item in items:
             add_item(item)
         return {"groups": [], "rows": len(items)}
 
-    # Group by the Class of the charged row; anything it includes travels with
-    # it. Preserve the configurator's own ordering, so a class appears where it
-    # first appears in the export and the base machine stays at the top.
     order, buckets = [], {}
     for block in attach_included(items):
         key = block["lead"]["class"]
@@ -622,7 +715,7 @@ def build_config_table(table, items: list[dict], group: bool = True) -> dict:
 
     counts = {}
     for key in order:
-        add_subheading(key)
+        add(class_proto, [key])
         counts[key] = 0
         for block in buckets[key]:
             add_item(block["lead"])
@@ -632,6 +725,88 @@ def build_config_table(table, items: list[dict], group: bool = True) -> dict:
                 counts[key] += 1
 
     return {"groups": [(k, counts[k]) for k in order], "rows": len(items)}
+
+
+# --------------------------------------------------------------------------- #
+# "What the configuration includes"
+# --------------------------------------------------------------------------- #
+# Classes that describe what the machine can do, as opposed to what it is
+# packed in or plugged into. The summary is meant to be read before the line
+# items, so a wooden box and a keyboard earn their place in the table above
+# but not in a list of capabilities.
+CAPABILITY_CLASSES = {
+    "base", "hardware", "software", "boundary scan", "matrix",
+    "open fix", "power supply", "cabinet/sorters",
+}
+
+
+def capability_lines(items: list[dict]) -> list[str]:
+    """One line per quoted capability, led by its module code."""
+    lines = []
+    for item in items:
+        if not item["qty"]:
+            continue                       # included in the line above it
+        if item["class"].strip().lower() not in CAPABILITY_CLASSES:
+            continue
+        code = item["module"] or item["description"][:20]
+        lines.append(f"{code} \u2014 {item['description']}")
+    return lines
+
+
+def fill_capabilities(doc, lines: list[str]) -> int:
+    """Replace the template's example capability lines with the real ones."""
+    template_lines = [p for p in doc.paragraphs
+                      if p.text.strip().startswith("[") and "CODE" in p.text]
+    if not template_lines:
+        return 0
+    prototype = template_lines[0]
+    anchor = prototype._p
+    for extra in template_lines[1:]:
+        extra._p.getparent().remove(extra._p)
+
+    written = 0
+    for line in lines:
+        new_p = copy.deepcopy(prototype._p)
+        anchor.addprevious(new_p)
+        from docx.text.paragraph import Paragraph
+        set_text(Paragraph(new_p, prototype._parent), line)
+        written += 1
+    anchor.getparent().remove(anchor)
+    return written
+
+
+# --------------------------------------------------------------------------- #
+# Machine picture
+# --------------------------------------------------------------------------- #
+def insert_picture(doc, path: str) -> tuple[float, float]:
+    """Place the machine photo directly under the title block.
+
+    This design ships without a picture frame, so one is created rather than
+    filled: a new centred paragraph after the one-line summary, before the
+    letterhead block.
+    """
+    from docx.image.image import Image as DocxImage
+    from docx.shared import Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.text.paragraph import Paragraph
+
+    leading = [p for p in doc.paragraphs if p.text.strip()][:2]
+    if not leading:
+        raise RuntimeError("the template has no title paragraph to sit under")
+    after = leading[-1]
+
+    holder = OxmlElement("w:p")
+    after._p.addnext(holder)
+    paragraph = Paragraph(holder, after._parent)
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    image = DocxImage.from_file(path)
+    box_w, box_h = PICTURE_BOX_IN
+    scale = min(box_w / image.width.inches, box_h / image.height.inches)
+    width = image.width.inches * scale
+    height = image.height.inches * scale
+    paragraph.add_run().add_picture(path, width=Inches(width), height=Inches(height))
+    return round(width, 2), round(height, 2)
 
 
 def ordinal(day: int) -> str:
@@ -653,12 +828,15 @@ def main(argv=None):
                     help="configurator export (.xls/.xlsx/.csv)")
     ap.add_argument("-o", "--output", help="output .docx (default: RFQ_<config title>.docx)")
     ap.add_argument("-t", "--template", default=DEFAULT_TEMPLATE)
-    ap.add_argument("--customer", default="", help="fills the 'To:' block")
+    ap.add_argument("--customer", default="", help="fills the 'To' cell")
     ap.add_argument("--date", default=None, help="e.g. 'September 7th, 2026' (default: today)")
-    ap.add_argument("--subject", default=None, help="text after 'Subject:'")
     ap.add_argument("--description", default=None,
-                    help="machine description; use ' | ' to split across the two lines")
+                    help="the title, or 'Solution name | one-line summary' "
+                         "to set both lines of the title block at once")
     ap.add_argument("--protocol", default="", help="e.g. 'PRV 260230/V_IL rev.01'")
+    ap.add_argument("--attention", default="", help="fills the 'Attn.' cell")
+    ap.add_argument("--summary", default="",
+                    help="the one-line summary under the title")
     ap.add_argument("--no-group", action="store_true",
                     help="keep raw export order instead of grouping by Class")
     ap.add_argument("--system", default=None,
@@ -674,10 +852,9 @@ def main(argv=None):
                     help="training line item to offer; repeatable, e.g. "
                          "--training install --training adv2w --training adv1w:2")
     ap.add_argument("--trainings-file", default=DEFAULT_TRAININGS)
-    ap.add_argument("--theme", default=DEFAULT_THEME,
-                    help="design tokens applied to the finished document")
-    ap.add_argument("--no-theme", action="store_true",
-                    help="leave the template's own styling untouched")
+    ap.add_argument("--theme", default=None,
+                    help="re-assert design tokens over the finished document; "
+                         "not needed - the template already carries them")
     ap.add_argument("--list-trainings", action="store_true",
                     help="print the training catalogue and exit")
     ap.add_argument("--list-systems", action="store_true",
@@ -703,18 +880,21 @@ def main(argv=None):
     doc = Document(args.template)
 
     desc = args.description or cfg["title"] or ""
-    desc_1, _, desc_2 = desc.partition(" | ")
+    solution, _, one_liner = desc.partition(" | ")
 
-    missing = fill_placeholders(doc, {
-        "CUSTOMER": args.customer,
-        "PROTOCOL": args.protocol,
-        "DATE": args.date or default_date(),
-        "SUBJECT": args.subject or "Offer as per your requirements",
-        "DESCRIPTION_1": desc_1.strip(),
-        "DESCRIPTION_2": desc_2.strip(),
+    fill_title(doc, solution.strip(), one_liner.strip() or args.summary or "")
+    letterhead = fill_letterhead(doc, {
+        "customer": args.customer,
+        "attention": args.attention,
+        "protocol": args.protocol,
+        "date": args.date or default_date(),
     })
 
     stats = build_config_table(find_config_table(doc), cfg["items"], group=not args.no_group)
+
+    # --- what the configuration includes -----------------------------------
+    lines = capability_lines(cfg["items"])
+    capabilities = {"written": fill_capabilities(doc, lines), "available": len(lines)}
 
     # --- system picture ----------------------------------------------------
     picture = {"status": "skipped"}
@@ -739,15 +919,18 @@ def main(argv=None):
         trainings = apply_trainings(doc, rows)
 
     # --- design tokens ------------------------------------------------------
-    theming = {"applied": False, "note": "not applied"}
-    if not args.no_theme and os.path.exists(args.theme):
+    # The template is itself the design system's output, so generated rows
+    # inherit their styling by being cloned from it. Theming is only here for
+    # re-asserting tokens over a template that has drifted.
+    theming = {"applied": False, "note": "template carries its own styling"}
+    if args.theme:
         from apply_theme import apply_theme, load_theme
         tokens = load_theme(args.theme)
         counts = apply_theme(doc, tokens)
         theming = {"applied": True, "source": tokens.get("source", "unspecified"),
                    **counts}
-    elif not args.no_theme:
-        theming = {"applied": False, "note": f"no theme file at {args.theme}"}
+
+    notes_removed = strip_author_notes(doc)
 
     out = args.output
     if not out:
@@ -760,7 +943,9 @@ def main(argv=None):
         "title": cfg["title"],
         "item_count": stats["rows"],
         "groups": stats["groups"],
-        "unfilled_placeholders": missing,
+        "letterhead_filled": letterhead,
+        "capabilities": capabilities,
+        "author_notes_removed": notes_removed,
         "picture": picture,
         "trainings": trainings,
         "theme": theming,
@@ -789,8 +974,9 @@ def main(argv=None):
                   f"{theming['header_rows']} table headers, "
                   f"{theming['subheadings']} class subheadings")
             print(f"    tokens from       : {theming['source']}")
-        if missing:
-            print("  still to fill in Word: " + ", ".join(missing))
+        print(f"  capability lines    : {capabilities['written']}")
+        if letterhead:
+            print("  letterhead filled   : " + ", ".join(letterhead))
     return 0
 
 

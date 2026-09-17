@@ -6,8 +6,10 @@ commercial offers.
 ## `rfq-from-config` skill
 
 `.claude/skills/rfq-from-config/` takes the spreadsheet the configurator
-produces for a machine build and writes it into the company RFQ letterhead as
-a formatted Configuration table, grouped by module class.
+produces for a machine build and fills the SEICA Israel commercial-offer
+template: the Configuration table grouped by module class, the "What the
+configuration includes" capability summary, the letterhead block, the machine
+photo, and the training lines in Pricing.
 
 It fills the letterhead fields, the configuration list, the system photo and
 the training line items. It deliberately does not touch prices,
@@ -23,9 +25,11 @@ Valid LR, Valid SL — with other views in `alternates/` and
 `assets/trainings.json` and are numbered `ADV_TRAIN#1`, `#2`, … in the order
 requested.
 
-Colours and typeface come from `assets/theme.json`. The values shipped today
-were sampled from the letterhead artwork, not from a design system — swap that
-one file to adopt the real tokens. `--no-theme` builds without them.
+Styling comes from the template itself, which is the SEICA Israel design
+system's own output; generated rows are cloned from it and inherit it.
+`assets/theme.json` records the palette for reference. The design marks
+unfilled values in a lighter slate, and the skill preserves that — so a built
+offer is grey exactly where a price or term still needs a person.
 
 ```bash
 pip install python-docx openpyxl xlrd
@@ -36,12 +40,13 @@ python3 $S/build_rfq.py --list-trainings      # what can be offered
 python3 $S/build_rfq.py --list-systems        # which machine photos exist
 
 python3 $S/build_rfq.py CONFIG.xlsx \
-  -o "RFQ_Customer_Machine.docx" \
-  --customer "Customer Ltd. / Attn: ..." \
+  -o "Offer_Customer_Machine.docx" \
+  --customer "Customer Ltd." --attention "Mr. ..." \
   --protocol "PRV 000000/V_IL rev.01" \
+  --description "Flying Probe Test Solution: Pilot VX | One line on what it does" \
   --training install --training adv2w --training adv1w
 
-python3 $S/check_rfq.py "RFQ_Customer_Machine.docx" \
+python3 $S/check_rfq.py "Offer_Customer_Machine.docx" \
   --config CONFIG.xlsx --expect-picture
 ```
 

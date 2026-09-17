@@ -62,48 +62,69 @@ is why the skill does not attempt to price anything.
 
 ## The RFQ template
 
-`assets/rfq_template.docx` is the example offer with the customer's data
-removed. Everything else — logos, page headers and footers, styles, the
-pricing and terms boilerplate, the spare-parts appendix — is carried over
-untouched, which is why the template is regenerated from a real offer rather
-than rebuilt from scratch.
+`assets/rfq_template.docx` is the SEICA Israel commercial-offer template, A4,
+Arial, carrying the letterhead logo in the page header and the company details
+in the footer. It is the design system's own output, so anything the script
+generates is cloned from a row or paragraph already in it and inherits the
+styling rather than restating it.
 
-### Tables, in document order
+### Blocks, in document order
 
-| # | Table | Skill writes it? |
-|---|---|---|
-| 0 | `To:` block | yes — `{{CUSTOMER}}` |
-| 1 | Protocol number / Date | yes — `{{PROTOCOL}}`, `{{DATE}}` |
-| 2 | Subject | yes — `{{SUBJECT}}` |
-| 3 | Description lines | yes — `{{DESCRIPTION_1}}`, `{{DESCRIPTION_2}}` |
-| 4 | **Configuration** (`#.` · `Incl.` · `Module` · `Description`) | yes — rebuilt from the export |
-| 5 | Pricing | no |
-| 6 | Service Contract Options | no |
-| 7 | Terms & conditions | no |
-| 8 | Spare parts appendix | no |
+| Block | Skill writes it? |
+|---|---|
+| Title paragraph | yes — from `--description` before the `\|` |
+| One-line summary | yes — after the `\|`, or `--summary` |
+| *(photo)* | yes — a centred paragraph it creates here |
+| To / Attn. / Protocol no. / Date | yes — matched by printed label |
+| **Configuration** table | yes — rebuilt from the export |
+| Pricing table | training rows only; codes and prices left alone |
+| **What the configuration includes** | yes — one line per quoted capability |
+| Service Contract Options | no |
+| Terms & Conditions | no |
+| Signature block | no |
 
-Column widths in the Configuration table are 426 / 522 / 2210 / 7599 twips.
+The Configuration grid is 567 / 624 / 1985 / 7029 twips.
 
-### Two things the template must keep
+### The placeholder colour is load-bearing
 
-**Each `{{TOKEN}}` lives in a single run.** Word splits text across runs as
-people type and spell-check, and a token broken into `{{CUST` + `OMER}}` is
-invisible to the replacement pass — the placeholder would ship to the customer.
-If you retype a placeholder in Word, regenerate the template with
-`make_template.py` instead of trusting the edit.
+The design writes unfilled values in slate `5B6A82` and real content with no
+colour override, inheriting the near-black default. Compare the Terms table
+(`__ days from PO`, in slate) with the Service Contract table (already written,
+no override).
 
-**The Configuration table keeps exactly one blank body row.** `build_rfq.py`
-deep-copies that row for every module, which is how borders, cell widths and
-fonts stay consistent without the script re-declaring any of it. Delete the
-prototype and the script has nothing to clone.
+`set_text` therefore *promotes* anything it fills: it drops a `w:color` of
+exactly `5B6A82` and leaves every other colour alone, since those were
+deliberate — a navy class row, a white header. The result is that a built offer
+is grey exactly where a person still owes something, most visibly every
+`[ 0,00 ]`. `PLACEHOLDER_COLOR` in `build_rfq.py` holds the value.
 
-Row 0 carries `w:tblHeader` so the column titles repeat when the table breaks
-across pages — a 70-row table always does.
+### Prototype rows
 
-Class subheadings are generated: the prototype row is cloned, its four cells
-merged, the text set bold, and the cell shaded `E0E0E0` — the same grey the
-template already uses for its other header rows, so the result looks native
-rather than bolted on.
+The Configuration table ships three example rows that double as prototypes, and
+`build_config_table` picks them out by shape rather than by index:
+
+- **class row** — a row merged into one cell, shaded `EAF2FA`
+- **charged row** — a quantity under `#.`
+- **included row** — a quantity under `Incl.`
+
+Deleting all three leaves nothing to clone and the build stops with a message.
+The four `[ CODE ] — [ … ]` lines under *What the configuration includes* work
+the same way: the first is the prototype, the rest are removed.
+
+### Author notes are stripped
+
+Two lines in the template address whoever is filling it in — "Duplicate a class
+row and its items…" and "The capability summary the customer reads…". They are
+instructions to the author, not to the customer, and read as a mistake in a
+document that has been sent, so `strip_author_notes` removes them from the
+output while leaving them in the template.
+
+### Placeholders are split across runs
+
+Word breaks `[ Code ]` into `[ ` and `Code ]` as it is typed and spell-checked,
+so a search-and-replace over run text misses them. `set_text` rewrites the
+paragraph from its first run instead, which sidesteps the splitting and keeps
+the font and size that run carries.
 
 ## The system picture
 
@@ -179,18 +200,17 @@ Overrides: `--system "Pilot VX"` names a library entry, `--picture PATH` uses a
 file directly (this is how to reach `alternates/`), `--no-picture` leaves the
 space empty.
 
-### Sizing
+### Sizing and placement
 
-The example offer sits the render in a **4.91 × 3.93 in** box (`PICTURE_BOX_IN`
-in `build_rfq.py`). New pictures are scaled to fit *inside* that box with their
-proportions intact, so a 4:1 panorama comes out 4.91 × 1.23 in and a tall
-portrait 0.98 × 3.93 in. Neither can push the rest of the page around, and
-`check_rfq.py` fails if a picture ever exceeds the box.
+This design ships **no picture frame**, so the script creates one: a centred
+paragraph inserted directly after the title block, before the letterhead table.
 
-The picture lives in the centred paragraph directly beneath the description
-block. `find_picture_anchor` locates it by that centring rather than by index,
-and the paragraph stays in the template even when empty — it is the anchor the
-script writes into.
+Photos are fitted inside a **3.60 × 2.60 in** box (`PICTURE_BOX_IN` in
+`build_rfq.py`) with proportions intact, so a 4:1 panorama comes out shorter and
+a tall portrait narrower. Half the 7.09 in text column keeps the photo clearly
+subordinate to the offer, and fitting rather than forcing a width means an
+odd-shaped image cannot push the letterhead down the page. `check_rfq.py` fails
+if a picture ever exceeds the box.
 
 ## The training catalogue
 
@@ -244,83 +264,64 @@ merged spans — for any row in that table.
 
 ## Design tokens
 
-`assets/theme.json` is the single source of visual values; `apply_theme.py`
-reads it and nothing else hard-codes a colour. To adopt a design system, change
-the values and leave the script alone.
+`assets/theme.json` records the Seica Israel palette and type scale:
 
 ```json
-"color":  { "brand_dark": "001860", "brand": "3084D8",
-            "brand_light": "6CA8CC", "neutral": "B4B4B4",
-            "heading_text": "001860", "on_brand": "FFFFFF" },
-"table":  { "header_fill": "001860", "header_text": "FFFFFF",
-            "subheading_fill": "3084D8", "subheading_text": "FFFFFF" }
+"color": { "brand_dark": "1A2B5A", "brand": "0082B5", "brand_light": "EAF2FA",
+           "neutral": "5B6A82", "heading_text": "0082B5",
+           "body_text": "0B1220", "placeholder": "5B6A82" },
+"table": { "header_fill": "1A2B5A", "header_text": "FFFFFF",
+           "subheading_fill": "EAF2FA", "subheading_text": "1A2B5A" }
 ```
 
-Colours are Word-style `RRGGBB` with no leading `#`. The `source` field records
-where the values came from; keep it honest, since it is printed on every build.
+These come from the design system itself, read out of the template it produced.
+**Nothing has to apply them for an offer to look right** — the template carries
+its own styling and generated rows inherit it by being cloned. The file exists
+so the palette is readable without opening Word, and so `apply_theme.py` can
+re-assert it over a template that has drifted. `--theme PATH` runs that pass;
+it is off by default.
 
-### Provenance of the shipped values
+`placeholder` is the exception to "reference only": `build_rfq.py` reads that
+colour to know what counts as unfilled. See **The placeholder colour is
+load-bearing** above.
 
-They were sampled from the letterhead artwork embedded in the template, not
-taken from a design system. The Seica Israel design system lives in Claude
-Design at project `16f0a237-5659-4ebf-a4ae-27ee0a19f8ee`, which needs an
-authorization that a remote session cannot obtain: `DesignSync` reports that
-`/design-login` must be run once from an interactive Claude Code session, or
-the project seeded into the workspace via "Send to Claude Code Web". A plain
-fetch of the share link returns 403. Until one of those happens, the tokens
-here are a stand-in.
+`apply_theme.py` restyles the body typeface, section headings, table header rows
+and class subheadings. It never touches page headers and footers (fixed logo
+artwork) or font sizes (the title is larger than the body on purpose, and
+flattening sizes would destroy the hierarchy while claiming to be a restyle).
 
-### What gets restyled
+## Replacing the template
 
-| Element | Token |
-|---|---|
-| all body text | `font.body` (family only — sizes untouched) |
-| section headings | `color.heading_text`, `font.heading` |
-| table header rows | `table.header_fill`, `table.header_text` |
-| class subheadings | `table.subheading_fill`, `table.subheading_text` |
+`assets/rfq_template.docx` comes from the SEICA Israel design system in Claude
+Design. To adopt a new revision, export it from there and drop it in — there is
+no conversion step, because the script reads the template by structure rather
+than by fixed positions.
 
-Header rows are found by their column titles (`HEADER_SIGNATURES`), scanning
-the first three rows rather than only the first — the spare-parts appendix
-opens with a merged title and puts its column names underneath.
+What a replacement must keep for the build to work:
 
-Class subheadings are restyled **only inside the Configuration table**. Treating
-every merged row as a subheading also catches the pricing table's `TOTAL SYSTEM
-PRICE` line and the spare-parts title, which mean something else and carry their
-own emphasis.
+- a table whose header row reads `#.` / `Incl.` / `Module` / `Description`
+- inside it, one shaded merged **class row**, one **charged** example row
+  (quantity under `#.`) and one **included** example row (quantity under
+  `Incl.`) — these are the prototypes that get cloned
+- a letterhead table containing the labels `To` and `Date` (and optionally
+  `Attn.`, `Protocol no.`), each with its value cell to the right
+- at least one `[ CODE ] — [ … ]` line under a *What the configuration includes*
+  heading
+- a pricing table with `Part number` and `Price` in its header row, and a row
+  whose description mentions training
 
-Never restyled: page headers and footers (fixed logo artwork), and the
-spare-parts data shading (colour there is information, not decoration).
-
-## Regenerating the template from a new letterhead
-
-When the company letterhead changes, take a real offer that already uses it:
-
-```bash
-python3 scripts/make_template.py NEW_OFFER.docx -o assets/rfq_template.docx
-```
-
-The script also lifts the machine photo out of the offer and writes it beside
-the output as `extracted_system_picture.png` — rename it after the system and
-move it into `assets/systems/`, since the photo belongs to the machine being
-quoted rather than to the letterhead.
-
-The script reports which placeholders it found. Anything listed under
-*NOT found in the source* has to be placed by hand — open the template in
-Word, type the token, and confirm it survived as one run:
+Then prove it before anyone quotes from it:
 
 ```bash
-python3 -c "import zipfile,re; \
-print(re.findall(r'\{\{\w+\}\}', zipfile.ZipFile('assets/rfq_template.docx') \
-.read('word/document.xml').decode()))"
-```
-
-Then prove the new template works end to end before anyone quotes from it:
-
-```bash
-python3 scripts/build_rfq.py SOME_EXPORT.xls -o /tmp/check.docx --customer "Test" \
-  --training install --training adv2w
+python3 scripts/build_rfq.py SOME_EXPORT.xls -o /tmp/check.docx \
+  --customer "Test" --training install --training adv2w
 python3 scripts/check_rfq.py /tmp/check.docx --config SOME_EXPORT.xls --expect-picture
 ```
+
+A previous `make_template.py` blanked a filled offer back into a template. It
+was written for the older template's `{{TOKEN}}` placeholders and is gone: the
+design system is the source of truth now, so a new template is exported rather
+than derived.
 
 ## If the Configuration table is renamed
 

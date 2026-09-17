@@ -25,8 +25,20 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_rfq import (read_config, find_config_table, find_pricing_table,  # noqa: E402
-                       find_picture_anchor, distinct_cells, PICTURE_BOX_IN,
-                       _is_training_row)
+                       distinct_cells, PICTURE_BOX_IN, _is_training_row,
+                       PLACEHOLDER_COLOR)
+
+
+def _every_paragraph(doc):
+    yield from doc.paragraphs
+    for table in doc.tables:
+        for row in table.rows:
+            seen = set()
+            for cell in row.cells:
+                if id(cell._tc) in seen:
+                    continue
+                seen.add(id(cell._tc))
+                yield from cell.paragraphs
 
 
 def collect_doc_rows(table) -> tuple[list[tuple[str, str, str]], list[str]]:
@@ -105,24 +117,72 @@ def main(argv=None) -> int:
         notes.append(f"letterhead images: {header_imgs}")
 
     # --- system picture ----------------------------------------------------
-    anchor = find_picture_anchor(doc)
-    if anchor is None:
-        problems.append("the template's picture anchor paragraph is gone")
+    extents = re.findall(r'<wp:extent cx="(\d+)" cy="(\d+)"', doc.element.body.xml)
+    if not extents:
+        message = "no system picture in the document"
+        (problems if args.expect_picture else notes).append(message)
     else:
-        extents = re.findall(r'<wp:extent cx="(\d+)" cy="(\d+)"', anchor._p.xml)
-        if not extents:
-            message = "no system picture in the document"
-            (problems if args.expect_picture else notes).append(message)
-        else:
-            width, height = (int(v) / 914400 for v in extents[0])
-            notes.append(f"system picture: {width:.2f}in x {height:.2f}in")
-            box_w, box_h = PICTURE_BOX_IN
-            # A picture wider or taller than the layout box pushes the page
-            # around, which is exactly what the fit-to-box sizing prevents.
-            if width > box_w + 0.02 or height > box_h + 0.02:
-                problems.append(
-                    f"the picture ({width:.2f} x {height:.2f}in) overflows the "
-                    f"{box_w} x {box_h}in layout box")
+        width, height = (int(v) / 914400 for v in extents[0])
+        notes.append(f"system picture: {width:.2f}in x {height:.2f}in")
+        box_w, box_h = PICTURE_BOX_IN
+        # A picture wider or taller than the layout box pushes the page around,
+        # which is exactly what the fit-to-box sizing prevents.
+        if width > box_w + 0.02 or height > box_h + 0.02:
+            problems.append(
+                f"the picture ({width:.2f} x {height:.2f}in) overflows the "
+                f"{box_w} x {box_h}in layout box")
+
+    # --- the parts of the letterhead the skill fills ------------------------
+    letterhead = next((t for t in doc.tables
+                       if {"to", "date"} <= {c.text.strip().lower()
+                                             for r in t.rows
+                                             for c in distinct_cells(r)}), None)
+    if letterhead is None:
+        problems.append("the To / Date letterhead block is missing")
+    else:
+        blank = []
+        for row in letterhead.rows:
+            cells = distinct_cells(row)
+            for index, cell in enumerate(cells):
+                label = cell.text.strip().lower()
+                if label in ("to", "attn.", "protocol no.", "date") and \
+                        index + 1 < len(cells) and not cells[index + 1].text.strip():
+                    blank.append(cell.text.strip())
+        if blank:
+            notes.append("letterhead still blank: " + ", ".join(blank))
+
+    # --- the capability summary ---------------------------------------------
+    # Scope to the section itself. Counting every "CODE \u2014 text" paragraph in the
+    # document also sweeps up the service-contract headings ("SEICA IL \u2014
+    # Service"), and a verifier that reports a number nobody can reconcile is
+    # worse than one that reports nothing.
+    capabilities, inside = [], False
+    for paragraph in doc.paragraphs:
+        text = paragraph.text.strip()
+        if not text:
+            continue
+        if text.lower().startswith("what the configuration includes"):
+            inside = True
+            continue
+        if inside:
+            if " \u2014 " not in text or text.startswith("["):
+                break          # the next heading ends the section
+            capabilities.append(text)
+    if capabilities:
+        notes.append(f"capability lines: {len(capabilities)}")
+    else:
+        notes.append("no capability lines written")
+
+    # --- what a person still has to fill in ---------------------------------
+    # The skill deliberately never prices anything, so leftover placeholders are
+    # expected. Counting them is how the operator knows what is outstanding
+    # rather than discovering it after the offer has gone out.
+    leftover = re.findall(r"\[\s*[^\]\[]{1,60}\s*\]", doc.element.body.xml and
+                          "\n".join(p.text for p in _every_paragraph(doc)))
+    if leftover:
+        unique = sorted(set(x.strip() for x in leftover))
+        notes.append(f"placeholders still to fill by hand: {len(leftover)} "
+                     f"({', '.join(unique[:4])}{', ...' if len(unique) > 4 else ''})")
 
     # --- training line items ------------------------------------------------
     pricing = find_pricing_table(doc)
