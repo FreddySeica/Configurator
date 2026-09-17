@@ -75,13 +75,21 @@ styling rather than restating it.
 | Title paragraph | yes — from `--description` before the `\|` |
 | One-line summary | yes — after the `\|`, or `--summary` |
 | *(photo)* | yes — a centred paragraph it creates here |
-| To / Attn. / Protocol no. / Date | yes — matched by printed label |
+| `To` | **no** by default — blank unless `--customer` is passed |
+| `Attn.` | blank unless `--attention` is passed |
+| `Protocol no.` | blank unless `--protocol` is passed |
+| `Date` | yes — today, unless `--date` overrides |
 | **Configuration** table | yes — rebuilt from the export |
-| Pricing table | training rows only; codes and prices left alone |
+| Pricing table | training rows only; part numbers and prices left alone |
 | **What the configuration includes** | yes — one line per quoted capability |
 | Service Contract Options | no |
 | Terms & Conditions | no |
 | Signature block | no |
+
+Only `Date` is filled without being asked for. Every other letterhead cell
+stays as the template left it unless the corresponding flag is supplied, so
+running the build with no letterhead flags produces an offer whose customer
+details are still a person's to write.
 
 The Configuration grid is 567 / 624 / 1985 / 7029 twips.
 
