@@ -39,6 +39,7 @@ DEFAULT_TEMPLATE = os.path.join(HERE, "..", "assets", "rfq_template.docx")
 DEFAULT_SYSTEMS = os.path.join(HERE, "..", "assets", "systems")
 DEFAULT_TRAININGS = os.path.join(HERE, "..", "assets", "trainings.json")
 DEFAULT_THEME = os.path.join(HERE, "..", "assets", "theme.json")
+DEFAULT_CAPABILITIES = os.path.join(HERE, "..", "assets", "capabilities.json")
 
 # The photo sits under the title on an A4 page with a 7.09 in text column.
 # Half the column keeps it clearly subordinate to the offer itself, and fitting
@@ -732,49 +733,125 @@ def build_config_table(table, items: list[dict], group: bool = True) -> dict:
 # --------------------------------------------------------------------------- #
 # "What the configuration includes"
 # --------------------------------------------------------------------------- #
-# Classes that describe what the machine can do, as opposed to what it is
-# packed in or plugged into. The summary is meant to be read before the line
-# items, so a wooden box and a keyboard earn their place in the table above
-# but not in a list of capabilities.
-CAPABILITY_CLASSES = {
-    "base", "hardware", "software", "boundary scan", "matrix",
-    "open fix", "power supply", "cabinet/sorters",
-}
+def load_capabilities(path: str) -> dict:
+    """The customer-facing copy library, flattened so aliases resolve directly."""
+    with open(path, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    flat = {}
+    for code, entry in raw.get("capabilities", {}).items():
+        record = dict(entry, code=code)
+        flat[code.strip().upper()] = record
+        for alias in entry.get("aliases", []):
+            flat[alias.strip().upper()] = record
+    return {
+        "lead_in": raw.get("lead_in", ""),
+        "furthermore_lead_in": raw.get("furthermore_lead_in", ""),
+        "by_code": flat,
+    }
 
 
-def capability_lines(items: list[dict]) -> list[str]:
-    """One line per quoted capability, led by its module code."""
-    lines = []
+def capability_entries(items: list[dict], library: dict) -> dict:
+    """Match the configuration against the copy library.
+
+    This section explains what the customer gets out of the machine, so it is
+    written from curated copy rather than from the export. A module appears only
+    if someone has written a line for it; the rest are reported instead, which
+    is what tells Sales where the library still has gaps. Falling back to the
+    export description would quietly turn the section back into a second copy of
+    the Configuration table.
+    """
+    by_code = library["by_code"]
+    main, furthermore, uncovered, seen = [], [], [], set()
+
     for item in items:
-        if not item["qty"]:
-            continue                       # included in the line above it
-        if item["class"].strip().lower() not in CAPABILITY_CLASSES:
+        code = (item["module"] or "").strip().upper()
+        if not code:
             continue
-        code = item["module"] or item["description"][:20]
-        lines.append(f"{code} \u2014 {item['description']}")
-    return lines
+        entry = by_code.get(code)
+        if entry is None:
+            if item["qty"]:                 # a charged line nobody has written up
+                uncovered.append(item["module"])
+            continue
+        if entry["code"] in seen:           # an alias of something already shown
+            continue
+        seen.add(entry["code"])
+        (furthermore if entry.get("group") == "furthermore" else main).append(entry)
+
+    return {"main": main, "furthermore": furthermore, "uncovered": uncovered}
 
 
-def fill_capabilities(doc, lines: list[str]) -> int:
-    """Replace the template's example capability lines with the real ones."""
+def fill_capabilities(doc, matched: dict, library: dict, machine: str = "") -> dict:
+    """Write the section, replacing the template's example lines.
+
+    Sub-bullets are the same list paragraph indented one step further. Adding a
+    second level to the template's numbering definition would mean editing the
+    design system's own file for the sake of one section, and the indent reads
+    the same to the customer.
+    """
+    from docx.text.paragraph import Paragraph
+    from docx.shared import Twips
+
     template_lines = [p for p in doc.paragraphs
                       if p.text.strip().startswith("[") and "CODE" in p.text]
     if not template_lines:
-        return 0
+        return {"written": 0, "note": "no capability lines in the template"}
+
     prototype = template_lines[0]
     anchor = prototype._p
     for extra in template_lines[1:]:
         extra._p.getparent().remove(extra._p)
 
+    # The lead-in sits above the list, so it borrows the intro paragraph's look
+    # rather than the bullet's - it is a sentence, not an item.
+    intro = None
+    for para in doc.paragraphs:
+        if para.text.strip().lower().startswith("the capability summary"):
+            intro = para
+            break
+
     written = 0
-    for line in lines:
-        new_p = copy.deepcopy(prototype._p)
-        anchor.addprevious(new_p)
-        from docx.text.paragraph import Paragraph
-        set_text(Paragraph(new_p, prototype._parent), line)
+
+    def add_line(text: str, indent_twips: int | None = None):
+        nonlocal written
+        node = copy.deepcopy(prototype._p)
+        anchor.addprevious(node)
+        para = Paragraph(node, prototype._parent)
+        set_text(para, text)
+        if indent_twips is not None:
+            para.paragraph_format.left_indent = Twips(indent_twips)
         written += 1
+        return para
+
+    if intro is not None and library.get("lead_in"):
+        set_text(intro, library["lead_in"].replace("{machine}", machine or "the system"))
+
+    for entry in matched["main"]:
+        add_line(entry["text"])
+        for bullet in entry.get("bullets", []):
+            add_line(bullet, indent_twips=1134)
+
+    if matched["furthermore"]:
+        lead = library.get("furthermore_lead_in")
+        if lead:
+            # The lead-in introduces the group, so it is a sentence rather than
+            # an item: the bullet is dropped by removing numPr from its pPr,
+            # which is where Word keeps it.
+            para = add_line(lead)
+            para.paragraph_format.left_indent = Twips(0)
+            pPr = para._p.find(qn("w:pPr"))
+            if pPr is not None:
+                numPr = pPr.find(qn("w:numPr"))
+                if numPr is not None:
+                    pPr.remove(numPr)
+        for entry in matched["furthermore"]:
+            add_line(entry["text"])
+            for bullet in entry.get("bullets", []):
+                add_line(bullet, indent_twips=1134)
+
     anchor.getparent().remove(anchor)
-    return written
+    return {"written": written,
+            "features": len(matched["main"]) + len(matched["furthermore"]),
+            "uncovered": matched["uncovered"]}
 
 
 # --------------------------------------------------------------------------- #
@@ -853,6 +930,8 @@ def main(argv=None):
                     help="training line item to offer; repeatable, e.g. "
                          "--training install --training adv2w --training adv1w:2")
     ap.add_argument("--trainings-file", default=DEFAULT_TRAININGS)
+    ap.add_argument("--capabilities", default=DEFAULT_CAPABILITIES,
+                    help="customer-facing copy for 'What the configuration includes'")
     ap.add_argument("--theme", default=None,
                     help="re-assert design tokens over the finished document; "
                          "not needed - the template already carries them")
@@ -893,8 +972,9 @@ def main(argv=None):
     stats = build_config_table(find_config_table(doc), cfg["items"], group=not args.no_group)
 
     # --- what the configuration includes -----------------------------------
-    lines = capability_lines(cfg["items"])
-    capabilities = {"written": fill_capabilities(doc, lines), "available": len(lines)}
+    library = load_capabilities(args.capabilities)
+    matched = capability_entries(cfg["items"], library)
+    capabilities = fill_capabilities(doc, matched, library, machine=solution.strip())
 
     # --- system picture ----------------------------------------------------
     picture = {"status": "skipped"}
@@ -974,7 +1054,12 @@ def main(argv=None):
                   f"{theming['header_rows']} table headers, "
                   f"{theming['subheadings']} class subheadings")
             print(f"    tokens from       : {theming['source']}")
-        print(f"  capability lines    : {capabilities['written']}")
+        print(f"  capability lines    : {capabilities['written']} "
+              f"({capabilities.get('features', 0)} features)")
+        if capabilities.get("uncovered"):
+            missing = capabilities["uncovered"]
+            print(f"  no customer copy yet: {len(missing)} module(s) - "
+                  + ", ".join(missing[:8]) + (", ..." if len(missing) > 8 else ""))
         if letterhead:
             print("  letterhead filled   : " + ", ".join(letterhead))
     return 0

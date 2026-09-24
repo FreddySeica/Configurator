@@ -136,13 +136,42 @@ mentioning before the offer goes out.
 
 ## What the configuration includes
 
-The summary takes one line per **quoted capability**: charged (`#.`) modules
-whose Class is Base, Hardware, Software, Boundary scan, Matrix, Open fix, Power
-Supply or Cabinet/sorters. Included rows are skipped — they are inside the lines
-above them — and so are Packaging, PC/Peripherals, Mech.Tools and Programming
-stations, because a wooden box and a keyboard earn a place in the table but not
-in a list of what the machine can do. That filter is `CAPABILITY_CLASSES` in
-`build_rfq.py`; widen it there if the user wants more.
+This section is **not** a second copy of the Configuration table. The table says
+what is in the crate; this says what the customer gets out of the machine, in
+their language. It is written from curated copy in `assets/capabilities.json`,
+keyed by module code:
+
+```json
+"DUALPROBESCOPE": {
+  "text": "2 High frequency mobile scope probes to measure up to 500 MHz ...",
+  "bullets": ["Clock Frequency", "Rise Time / Fall Time", "..."]
+}
+```
+
+A module appears **only if someone has written copy for it** — presence in that
+file is the curation. Modules with no entry are left out of the prose and
+reported instead:
+
+```
+no customer copy yet: 16 module(s) - PCW11TOW, PRTERFP, UPS, ...
+```
+
+Treat that list as a worklist, not an error. Offer to draft copy for anything on
+it that matters to the deal, and add it to the library so the next offer has it.
+Never fall back to the export description to fill a gap: that is precisely what
+turns this section back into a mirror of the table.
+
+Fields: `text` is the line; `bullets` are indented sub-points; `group:
+"furthermore"` moves an item under a *Furthermore the offer includes:* lead-in;
+`aliases` share one piece of copy across codes that read the same to a customer
+(the Goepel and JTAG boundary-scan variants, for instance).
+
+**The copy is commercial writing, so accuracy matters more than coverage.**
+Every figure in a line should come from the export description or a previous
+offer. If a number is not there, leave it out rather than guessing — an invented
+frequency or current rating in a quote is a promise the machine may not keep.
+Entries drafted from export text rather than reviewed by Sales are flagged in
+the file's own header.
 
 ## The system picture
 
@@ -176,6 +205,7 @@ it stays subordinate to the offer and cannot push the letterhead down the page.
 - `scripts/apply_theme.py` — re-assert design tokens over a drifted template
 - `assets/rfq_template.docx` — the SEICA Israel commercial-offer template
 - `assets/trainings.json` — the training catalogue
+- `assets/capabilities.json` — customer-facing copy per module code
 - `assets/theme.json` — the design system's tokens, for reference
 - `assets/systems/` — machine photos, `aliases.json`, `alternates/`
 - `references/format.md` — export layout, template anatomy, catalogue format

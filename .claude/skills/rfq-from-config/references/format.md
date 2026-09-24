@@ -300,6 +300,67 @@ and class subheadings. It never touches page headers and footers (fixed logo
 artwork) or font sizes (the title is larger than the body on purpose, and
 flattening sizes would destroy the hierarchy while claiming to be a restyle).
 
+## The capability copy library
+
+`assets/capabilities.json` holds the customer-facing copy for *What the
+configuration includes*. The section explains what the machine does for the
+customer; the Configuration table already lists what is in it, so this file is
+what keeps the two from saying the same thing twice.
+
+```json
+{
+  "lead_in": "The solution offered is N°1 unit {machine}, equipped with:",
+  "furthermore_lead_in": "Furthermore the offer includes:",
+  "capabilities": {
+    "OBPFPDVC": {
+      "text": "1 Seica general purpose programmer option for On-board programming ...",
+      "aliases": ["OBPDVC4"]
+    }
+  }
+}
+```
+
+| Field | Purpose |
+|---|---|
+| `text` | the line the customer reads; lead with what they get |
+| `bullets` | sub-points, indented one level under the line |
+| `group` | `main` (default) or `furthermore` |
+| `aliases` | other codes reusing this copy; the first match wins and later aliases are skipped |
+
+`{machine}` in `lead_in` is replaced with the solution name — the part of
+`--description` before the `|`.
+
+### Matching and gaps
+
+`capability_entries` walks the configuration in export order and looks each
+module code up in the library. Codes with no entry are **not** written; if the
+row was a charged line, the code is returned in `uncovered` and printed after
+the build. That report is the mechanism for growing the library: it names
+exactly what a customer would have read about and did not.
+
+Falling back to the export description for an unmatched module would restore
+the mirror this section exists to avoid, so there is deliberately no such
+fallback.
+
+### Sub-bullets
+
+The template defines a single bullet level (`numId` 1, `ilvl` 0, en-dash).
+Sub-points reuse that list and add a 1134-twip left indent rather than a second
+level being added to `numbering.xml` — editing the design system's own numbering
+for the sake of one section is a bigger change than the visual difference
+justifies.
+
+The *Furthermore the offer includes:* lead-in is the same paragraph with its
+`numPr` removed from its `pPr`, since it introduces the group rather than being
+an item in it.
+
+### Writing the copy
+
+Every figure should trace to the export description or a previous offer. The
+file's header says so, and it matters: this text goes to a customer, and an
+invented rating is a commitment the machine may not meet. Entries not yet
+reviewed by Sales are marked as drafts there.
+
 ## Replacing the template
 
 `assets/rfq_template.docx` comes from the SEICA Israel design system in Claude

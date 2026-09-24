@@ -1,0 +1,158 @@
+{
+  "_comment": [
+    "Customer-facing copy for the 'What the configuration includes' section.",
+    "",
+    "This section is NOT a second copy of the Configuration table. The table says",
+    "what is in the crate; this says what the customer gets out of the machine.",
+    "So a module appears here only if someone has written copy for it - presence",
+    "in this file IS the curation, and a module with no entry is simply left out",
+    "of the prose rather than dumped in with its raw export description.",
+    "",
+    "Each entry is keyed by the module code exactly as the configurator exports",
+    "it. Fields:",
+    "  text     - the line the customer reads. Lead with what they get.",
+    "  bullets  - optional sub-points, indented one level under the line.",
+    "  group    - 'main' (default) or 'furthermore', which is written under a",
+    "             'Furthermore the offer includes:' lead-in.",
+    "  aliases  - other codes that should reuse this copy (e.g. the Goepel and",
+    "             JTAG boundary-scan variants all read the same to a customer).",
+    "",
+    "DRAFT WARNING: everything except DUALPROBESCOPE and NETDONGLE was drafted",
+    "from the configurator's own export descriptions and has not been reviewed by",
+    "Sales. Read a line before it goes to a customer. No figure here should be",
+    "invented - if a number is not in the export description or a previous offer,",
+    "leave it out rather than guessing."
+  ],
+
+  "lead_in": "The solution offered is N°1 unit {machine}, equipped with:",
+  "furthermore_lead_in": "Furthermore the offer includes:",
+
+  "capabilities": {
+    "VX": {
+      "text": "Dual-side vertical flying probe with 8 flying electrical probes (4 + 4), giving full in-circuit and functional test capability on double-sided boards without a dedicated fixture."
+    },
+    "8Z-HEADS-HR": {
+      "text": "1 µm resolution Z motors on all 8 heads, for repeatable probing force and reliable contact on fine-pitch pads."
+    },
+    "ACL": {
+      "text": "Measurement and stimuli motherboard with MONIACL - the analogue core that performs the in-circuit measurements."
+    },
+    "ALI": {
+      "text": "2 Laser sensors for warpage compensation and optical inspection (ALI) - the real board surface is mapped before probing, so contact stays accurate on bowed panels."
+    },
+    "DUALPROBESCOPE": {
+      "text": "2 High frequency mobile scope probes to measure up to 500 MHz (DUALPROBESCOPE), including picoscope macros that contain basic parameters designed to conduct:",
+      "bullets": [
+        "Clock Frequency",
+        "Rise Time / Fall Time",
+        "Pulse width",
+        "Duty Cycle",
+        "Vpp / Minimum / Maximum",
+        "All picoscope macros will include trigger options.",
+        "All macros will have the expected values and tolerance allowed by the user."
+      ]
+    },
+    "OBPFPDVC": {
+      "text": "1 Seica general purpose programmer option for On-board programming (OBPFPDVC) - devices are programmed in place, with no separate programming step.",
+      "aliases": ["OBPDVC4"]
+    },
+    "PRBOOST": {
+      "text": "PRBOOST feature which allows the user to get 2A from each of the 8 regular probes, so power rails and loads can be driven during functional test."
+    },
+    "FLYSTRAIN": {
+      "text": "FLYSTRAIN option to measure the probes pressure applied to the UUT, keeping probing force inside the board's mechanical limits."
+    },
+    "PRBVIEW": {
+      "text": "4 CCD cameras PRBVIEW - the probes are seen directly during debug, so contact problems are visible rather than inferred."
+    },
+    "MOTCAMS": {
+      "text": "Front and rear motorized CCD cameras (MOTCAMS) - focus adjusts for thick boards and tall components instead of being set by hand."
+    },
+    "RFMEAS": {
+      "text": "RF measurement capability up to 100 MHz through the coax path on the standard probes, with no additional fixturing."
+    },
+    "V8OFX": {
+      "text": "OPENFIX - Dual Side - 0 Angle Open Pin Detector Probe, for finding open pins that electrical test alone does not see."
+    },
+    "FLYJTAG1": {
+      "text": "1 Boundary Scan test with the integrated option - JTAG chains are exercised from the same program as the electrical test.",
+      "aliases": ["FLYGOEP2", "FLYGOEP3"]
+    },
+    "ICT": {
+      "text": "In circuit test software for shorts, opens, passives and semiconductors."
+    },
+    "QT": {
+      "text": "Quick Test graphical operating system for functional test - sequences are built graphically rather than coded."
+    },
+    "VIW": {
+      "text": "VIW - AOI capabilities + barcode reading, including 2D codes, so optical inspection and traceability happen in the same pass as electrical test."
+    },
+    "FLYLAB": {
+      "text": "FLYLAB (manual tool for quick measurements) - interactive probing during debug without rerunning a program."
+    },
+    "ERPS": {
+      "text": "ERPS - Enhanced Repair Station for diagnostic of reports, so the repair operator sees what failed and where."
+    },
+    "VIVA": {
+      "text": "VIVA Test Operating System licence - the single environment in which programs are written, run and debugged."
+    },
+    "STAT": {
+      "text": "Statistics software including XML and PPVS reporting and SPC tools (Cp, Cpk, GR&R) for monitoring process capability over time."
+    },
+    "VLFUN": {
+      "text": "VIVA Language for functional test, for custom test steps where the standard library does not cover a device.",
+      "aliases": ["VLICT"]
+    },
+    "CAD": {
+      "text": "CAD software database used to generate test programs directly from board data."
+    },
+    "MENTORPACK": {
+      "text": "CAD translators package based on Siemens Valor Process Preparation, including first year maintenance - board data from the major CAD systems is imported without manual conversion."
+    },
+    "PSTDI": {
+      "text": "1 programming station off-line (PSTDI) - programs are written and debugged away from the tester, so the machine keeps testing."
+    },
+    "S64NTX": {
+      "text": "S64 matrix card with embedded traceability and extended performances, expanding the channels available to functional test.",
+      "aliases": ["S64FTX", "S64A3DX"]
+    },
+    "S64H": {
+      "text": "64 analogue channels matrix, high power, 500 VDC at 2 A."
+    },
+    "SE5": {
+      "text": "Power supply controller, required for the PRBOOST option."
+    },
+    "AP5": {
+      "text": "Programmable linear power supplies for powering the board under test.",
+      "aliases": ["AP6"]
+    },
+    "LUV8M": {
+      "text": "Multi Magaziner loader and unloader, up to 5+1+5 racks with boards held vertically, for unattended in-line operation."
+    },
+    "PASSFAIL": {
+      "text": "Good/bad board separation into the same magazine with an empty slot between them, so sorting needs no operator."
+    },
+    "CLEA60": {
+      "text": "Z clearance extended from 40 mm to 60 mm, for taller assemblies."
+    },
+    "AWAM": {
+      "text": "Automated width adjust for the board conveyor."
+    },
+    "FNODE": {
+      "text": "Frequency net test."
+    },
+    "OPENFUN": {
+      "text": "Third party software caller from VIVA, for integrating test executables you already own."
+    },
+    "RAIL8MM": {
+      "text": "Maximum UUT thickness extended from 5 mm to 8 mm."
+    },
+    "FBBT4": {
+      "text": "Universal frame for irregularly shaped boards, suitable for manual and automated systems."
+    },
+    "NETDONGLE": {
+      "text": "NETDONGLE: the existing NETDONGLE (SEICA P/N AE-D0NGLUSB-13) can be used to enable VIVA software on additional networked workstations, up to a maximum of ten (10) users.",
+      "group": "furthermore"
+    }
+  }
+}

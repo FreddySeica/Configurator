@@ -8,8 +8,13 @@ commercial offers.
 `.claude/skills/rfq-from-config/` takes the spreadsheet the configurator
 produces for a machine build and fills the SEICA Israel commercial-offer
 template: the Configuration table grouped by module class, the "What the
-configuration includes" capability summary, the letterhead block, the machine
-photo, and the training lines in Pricing.
+configuration includes" section, the letterhead block, the machine photo, and
+the training lines in Pricing.
+
+That section is written from curated customer-facing copy in
+`assets/capabilities.json` rather than mirroring the table — a module appears
+only if someone has written a line for it, and modules without copy are
+reported after each build so the library can grow.
 
 It fills the letterhead fields, the configuration list, the system photo and
 the training line items. It deliberately does not touch prices,
