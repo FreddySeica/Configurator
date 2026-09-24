@@ -41,7 +41,7 @@ python3 $S/build_rfq.py --list-systems        # which machine photos exist
 
 python3 $S/build_rfq.py CONFIG.xlsx \
   -o "Offer_Customer_Machine.docx" \
-  --customer "Customer Ltd." --attention "Mr. ..." \
+  --attention "Mr. ..." \
   --protocol "PRV 000000/V_IL rev.01" \
   --description "Flying Probe Test Solution: Pilot VX | One line on what it does" \
   --training install --training adv2w --training adv1w

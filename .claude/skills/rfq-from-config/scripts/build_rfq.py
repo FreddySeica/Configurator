@@ -12,8 +12,8 @@ them with a placeholder colour that this script is careful not to overwrite -
 so a built offer shows at a glance what still needs a human.
 
 Usage:
-    python3 build_rfq.py CONFIG_EXPORT [-o OUT.docx] [--customer "..."]
-                         [--attention "..."] [--protocol "..."] [--date ...]
+    python3 build_rfq.py CONFIG_EXPORT [-o OUT.docx] [--attention "..."]
+                         [--protocol "..."] [--date ...]
                          [--description "Title | one-line summary"]
                          [--training KEY[:N]] [--system NAME] [--no-group] [--json]
 """
@@ -548,8 +548,10 @@ def find_pricing_table(doc):
 # --------------------------------------------------------------------------- #
 # Letterhead and title
 # --------------------------------------------------------------------------- #
+# "To" is deliberately absent. The customer's name is written by the person
+# sending the offer, so there is no route from that label to a value and the
+# cell cannot be filled even by accident.
 LETTERHEAD_LABELS = {
-    "to": "customer",
     "attn.": "attention",
     "attn": "attention",
     "protocol no.": "protocol",
@@ -828,7 +830,6 @@ def main(argv=None):
                     help="configurator export (.xls/.xlsx/.csv)")
     ap.add_argument("-o", "--output", help="output .docx (default: RFQ_<config title>.docx)")
     ap.add_argument("-t", "--template", default=DEFAULT_TEMPLATE)
-    ap.add_argument("--customer", default="", help="fills the 'To' cell")
     ap.add_argument("--date", default=None, help="e.g. 'September 7th, 2026' (default: today)")
     ap.add_argument("--description", default=None,
                     help="the title, or 'Solution name | one-line summary' "
@@ -884,7 +885,6 @@ def main(argv=None):
 
     fill_title(doc, solution.strip(), one_liner.strip() or args.summary or "")
     letterhead = fill_letterhead(doc, {
-        "customer": args.customer,
         "attention": args.attention,
         "protocol": args.protocol,
         "date": args.date or default_date(),

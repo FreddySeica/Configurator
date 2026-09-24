@@ -10,13 +10,13 @@ spreadsheet, and needs a formal offer to send. Doing that by hand means pasting
 50–70 rows into Word and repairing the formatting every time. This skill does
 the paste, and deliberately stops short of the commercial decisions.
 
-**What the skill fills:** the title and its one-line summary, the To / Attn. /
-Protocol no. / Date block, the system photo, the **Configuration** table, the
+**What the skill fills:** the title and its one-line summary, the Attn. /
+Protocol no. / Date cells, the system photo, the **Configuration** table, the
 **What the configuration includes** summary, and the training lines in Pricing.
 
-**What it leaves for a person — on purpose:** every price, the part numbers in
-the Pricing table, freight and incoterms, service-contract figures, and the
-blanks in Terms & Conditions. Prices and delivery terms are commitments to a
+**What it leaves for a person — on purpose:** the customer's name in the `To`
+cell, every price, the part numbers in the Pricing table, freight and
+incoterms, service-contract figures, and the blanks in Terms & Conditions. Prices and delivery terms are commitments to a
 customer; a wrong number there costs far more than a missing one. Say so when
 handing the file back rather than letting the user discover it.
 
@@ -49,7 +49,12 @@ Dependencies, if the script complains: `pip install python-docx openpyxl xlrd`
 
 ### 2. Ask once, for what the spreadsheet cannot say
 
-**The customer** — never inferable. Always ask, along with the `Attn.` contact.
+**The `Attn.` contact** — never inferable, so ask for it.
+
+The customer's own name is not the skill's to write: there is no flag for it and
+no route from the `To` label to a value, so that cell always reaches the user
+blank. Mention it in the handover rather than asking for something you cannot
+use.
 
 **The trainings** — the export says nothing about them and the count varies per
 deal. Show the catalogue and ask in plain terms ("installation week plus how
@@ -77,7 +82,7 @@ the user to type in Word.
 ```bash
 python3 scripts/build_rfq.py CONFIG.xlsx \
   -o "Offer_<Customer>_<Machine>.docx" \
-  --customer "Valid Ltd." --attention "Mr. Cohen" \
+  --attention "Mr. Cohen" \
   --protocol "PRV 260230/V_IL rev.01" \
   --description "Flying Probe Test Solution: Pilot VX | Dual-side functional and in-circuit test for vertical double-sided boards" \
   --training install --training adv2w --training adv1w
@@ -106,9 +111,9 @@ run it rather than eyeballing the table.
 
 ### 5. Hand back and say what is open
 
-Deliver the `.docx` and name what still needs the user: the prices, the part
-numbers in Pricing, freight and incoterm, the service-contract figures, and the
-blanks in Terms. Do not describe the offer as ready to send.
+Deliver the `.docx` and name what still needs the user: the customer's name in
+the `To` cell, the prices, the part numbers in Pricing, freight and incoterm,
+the service-contract figures, and the blanks in Terms. Do not describe the offer as ready to send.
 
 ## Included modules travel with their parent
 

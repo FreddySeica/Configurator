@@ -75,7 +75,7 @@ styling rather than restating it.
 | Title paragraph | yes — from `--description` before the `\|` |
 | One-line summary | yes — after the `\|`, or `--summary` |
 | *(photo)* | yes — a centred paragraph it creates here |
-| `To` | **no** by default — blank unless `--customer` is passed |
+| `To` | **never** — there is no flag for it and no label mapping |
 | `Attn.` | blank unless `--attention` is passed |
 | `Protocol no.` | blank unless `--protocol` is passed |
 | `Date` | yes — today, unless `--date` overrides |
@@ -86,10 +86,12 @@ styling rather than restating it.
 | Terms & Conditions | no |
 | Signature block | no |
 
-Only `Date` is filled without being asked for. Every other letterhead cell
-stays as the template left it unless the corresponding flag is supplied, so
-running the build with no letterhead flags produces an offer whose customer
-details are still a person's to write.
+`To` is absent from `LETTERHEAD_LABELS` rather than merely left unsupplied:
+with no route from that label to a value, the cell cannot be written even by
+mistake. The customer's name is written by whoever sends the offer.
+
+Of the rest, only `Date` is filled without being asked for; `Attn.` and
+`Protocol no.` stay as the template left them unless their flag is passed.
 
 The Configuration grid is 567 / 624 / 1985 / 7029 twips.
 
@@ -322,7 +324,7 @@ Then prove it before anyone quotes from it:
 
 ```bash
 python3 scripts/build_rfq.py SOME_EXPORT.xls -o /tmp/check.docx \
-  --customer "Test" --training install --training adv2w
+  --attention "Test" --training install --training adv2w
 python3 scripts/check_rfq.py /tmp/check.docx --config SOME_EXPORT.xls --expect-picture
 ```
 
