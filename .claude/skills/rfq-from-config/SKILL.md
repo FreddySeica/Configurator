@@ -159,6 +159,12 @@ machine features.
 Copy may exist for a module the class filter keeps out. That is deliberate:
 widening `include_classes` later then costs nothing.
 
+`hidden: true` keeps a line on file but out of the section — for items that are
+real but are not capabilities. `KEL` and `M22-16/9` carry it: a keyboard and a
+monitor beside the laser sensors and scope probes dilute what the section is
+saying. They stay in the Configuration table, and the build reports what it
+held back.
+
 `class_overrides` refiles a module everywhere — the Configuration table's class
 rows as well as this section. `PRBVIEW` (filed Mech.Tools) and `V8OFX` (filed
 Open fix) are both moved to Hardware, so one correction keeps the two places

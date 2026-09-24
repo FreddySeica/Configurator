@@ -782,7 +782,7 @@ def capability_entries(items: list[dict], library: dict) -> dict:
     """
     by_code = library["by_code"]
     include = library.get("include_classes") or set()
-    main, furthermore, uncovered, seen = [], [], [], set()
+    main, furthermore, uncovered, held_back, seen = [], [], [], [], set()
 
     for item in items:
         code = (item["module"] or "").strip().upper()
@@ -805,9 +805,16 @@ def capability_entries(items: list[dict], library: dict) -> dict:
         if entry["code"] in seen:           # an alias of something already shown
             continue
         seen.add(entry["code"])
+        if entry.get("hidden"):
+            # Copy exists, but someone decided this line does not belong in a
+            # list of what the machine does. Reported rather than dropped
+            # silently, so the decision stays visible.
+            held_back.append(entry["code"])
+            continue
         (furthermore if is_extra else main).append(entry)
 
-    return {"main": main, "furthermore": furthermore, "uncovered": uncovered}
+    return {"main": main, "furthermore": furthermore, "uncovered": uncovered,
+            "held_back": held_back}
 
 
 def fill_capabilities(doc, matched: dict, library: dict, machine: str = "") -> dict:
@@ -881,7 +888,8 @@ def fill_capabilities(doc, matched: dict, library: dict, machine: str = "") -> d
     anchor.getparent().remove(anchor)
     return {"written": written,
             "features": len(matched["main"]) + len(matched["furthermore"]),
-            "uncovered": matched["uncovered"]}
+            "uncovered": matched["uncovered"],
+            "held_back": matched.get("held_back", [])}
 
 
 # --------------------------------------------------------------------------- #
@@ -1090,6 +1098,8 @@ def main(argv=None):
               f"({capabilities.get('features', 0)} features)")
         if reclassified:
             print("  reclassified        : " + "; ".join(reclassified))
+        if capabilities.get("held_back"):
+            print("  held back from it   : " + ", ".join(capabilities["held_back"]))
         if capabilities.get("uncovered"):
             missing = capabilities["uncovered"]
             print(f"  no customer copy yet: {len(missing)} module(s) - "

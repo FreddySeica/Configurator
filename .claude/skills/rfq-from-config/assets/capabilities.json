@@ -23,6 +23,9 @@
     "  bullets  - optional sub-points, indented one level under the line.",
     "  group    - 'main' (default) or 'furthermore'.",
     "  aliases  - other codes that reuse this copy.",
+    "  hidden   - keep the copy on file but leave it out of the section. For",
+    "             line items that are real but are not capabilities - a keyboard,",
+    "             a monitor - which would otherwise dilute what the section says.",
     "",
     "DRAFT WARNING: everything except DUALPROBESCOPE and NETDONGLE was drafted from",
     "the configurator's own export descriptions and has not been reviewed by Sales.",
@@ -174,10 +177,12 @@
       "text": "Licence dongle for the Repair Station software, so the repair bench runs independently of the tester."
     },
     "KEL": {
-      "text": "Large English keyboard supplied with the offline station."
+      "text": "Large English keyboard supplied with the offline station.",
+      "hidden": true
     },
     "M22-16/9": {
-      "text": "23\" 16:9 monitor supplied with the offline station."
+      "text": "23\" 16:9 monitor supplied with the offline station.",
+      "hidden": true
     },
     "PCW11TOW": {
       "text": "PC tower, 64-bit, i7 9th generation, 16 GB RAM, 250 GB SSD and 1 TB hard disk, suitable for Windows 11."

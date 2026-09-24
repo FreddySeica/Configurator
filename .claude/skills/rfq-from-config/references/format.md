@@ -326,6 +326,7 @@ what keeps the two from saying the same thing twice.
 | `bullets` | sub-points, indented one level under the line |
 | `group` | `main` (default) or `furthermore` |
 | `aliases` | other codes reusing this copy; the first match wins and later aliases are skipped |
+| `hidden` | keep the copy, leave it out of the section |
 
 `{machine}` in `lead_in` is replaced with the solution name — the part of
 `--description` before the `|`.
@@ -347,6 +348,17 @@ only if **both** gates pass:
 
 An entry with `group: "furthermore"` skips gate 1. Those are offer extras, not
 machine features, and excluding them by class would be wrong.
+
+`hidden: true` is the third way out: the copy exists and stays on file, but the
+line is not written. It is for items that are genuinely in the offer without
+being capabilities - `KEL` (a keyboard) and `M22-16/9` (a monitor) both carry
+it, since listing them beside the laser sensors weakens the section. They are
+reported as `held_back` rather than dropped silently, so the decision stays
+visible in the build output:
+
+```
+held back from it   : KEL, M22-16/9
+```
 
 A module that passes gate 1 but fails gate 2 is reported in `uncovered` and
 printed after the build — that report is how the library grows, naming exactly
