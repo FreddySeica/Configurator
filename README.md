@@ -44,12 +44,17 @@ S=.claude/skills/rfq-from-config/scripts
 python3 $S/build_rfq.py --list-trainings      # what can be offered
 python3 $S/build_rfq.py --list-systems        # which machine photos exist
 
+python3 $S/build_rfq.py --list-trainings   # advanced training options
+python3 $S/build_rfq.py --list-services    # service contract options
+
 python3 $S/build_rfq.py CONFIG.xlsx \
   -o "Offer_Customer_Machine.docx" \
   --attention "Mr. ..." \
   --protocol "PRV 000000/V_IL rev.01" \
   --description "Flying Probe Test Solution: Pilot VX | One line on what it does" \
-  --training install --training adv2w --training adv1w
+  --training adv2w \
+  --freight "DDP — sea freight" \
+  --service "IL — Service" --service "Italy"
 
 python3 $S/check_rfq.py "Offer_Customer_Machine.docx" \
   --config CONFIG.xlsx --expect-picture

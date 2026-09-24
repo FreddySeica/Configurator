@@ -349,6 +349,14 @@ def parse_training_args(requested: list[str], catalog: list[dict]) -> list[dict]
     ordering a reader expects, and the one the example offer uses.
     """
     by_key = {entry["key"]: entry for entry in catalog}
+
+    # Entries marked "always" are part of every machine sale, so they are
+    # written whether or not anyone asked. Listing one explicitly must not
+    # produce it twice.
+    asked = [item.split(":")[0].strip() for item in requested]
+    automatic = [e["key"] for e in catalog if e.get("always") and e["key"] not in asked]
+    requested = automatic + list(requested)
+
     chosen, counter = [], 0
     for item in requested:
         key, _, count = item.partition(":")
@@ -535,6 +543,31 @@ def find_config_table(doc):
         "The template has no Configuration table. Expected a table whose first "
         "row reads '#. | Incl. | Module | Description'."
     )
+
+
+FREIGHT_HINT = "freight"
+SYSTEM_HINT = "the configured system"
+
+
+def apply_freight(table, wanted: str | None) -> dict:
+    """Keep the freight line only when the offer actually quotes carriage.
+
+    An unchosen line is deleted rather than left as a placeholder: a blank
+    "[ Freight and duties ]" row in a sent offer reads as an oversight, and the
+    customer cannot tell whether carriage was forgotten or deliberately
+    excluded.
+    """
+    for row in table.rows:
+        cells = distinct_cells(row)
+        if len(cells) < 2 or FREIGHT_HINT not in cells[1].text.strip().lower():
+            continue
+        if wanted is None:
+            row._tr.getparent().remove(row._tr)
+            return {"kept": False}
+        if wanted:                      # a term was given, so name it
+            set_cell(cells[1], wanted)
+        return {"kept": True, "terms": wanted or "(template text kept)"}
+    return {"kept": False, "note": "no freight row in the template"}
 
 
 def find_pricing_table(doc):
@@ -728,6 +761,107 @@ def build_config_table(table, items: list[dict], group: bool = True) -> dict:
                 counts[key] += 1
 
     return {"groups": [(k, counts[k]) for k in order], "rows": len(items)}
+
+
+# --------------------------------------------------------------------------- #
+# Service contract options
+# --------------------------------------------------------------------------- #
+def find_service_table(doc):
+    for table in doc.tables:
+        header = [c.text.strip().lower() for c in distinct_cells(table.rows[0])]
+        if any(h.startswith("service type") for h in header):
+            return table
+    return None
+
+
+def list_services(doc) -> list[str]:
+    table = find_service_table(doc)
+    if table is None:
+        return []
+    return [distinct_cells(r)[0].text.strip() for r in table.rows[1:]
+            if distinct_cells(r)[0].text.strip()]
+
+
+def _is_section_heading(paragraph) -> bool:
+    """A 14pt run marks a top-level section in this template."""
+    for run in paragraph.runs:
+        if run.font.size and run.font.size.pt >= 13:
+            return True
+    return False
+
+
+def _remove_service_explanation(doc, name: str, all_names: list[str]) -> int:
+    """Delete a service's heading and the bullets under it.
+
+    An offer that drops a service from the price table but keeps the paragraph
+    explaining it tells the customer they are getting something they are not.
+    The block runs from its heading to the next service heading or the next
+    section, whichever comes first.
+    """
+    others = {n.strip().lower() for n in all_names if n != name}
+    paragraphs = list(doc.paragraphs)
+    removed, inside = 0, False
+    for paragraph in paragraphs:
+        text = paragraph.text.strip()
+        if not inside:
+            if text.lower() == name.strip().lower():
+                inside = True
+                paragraph._p.getparent().remove(paragraph._p)
+                removed += 1
+            continue
+        if text.lower() in others or (text and _is_section_heading(paragraph)):
+            break
+        paragraph._p.getparent().remove(paragraph._p)
+        removed += 1
+    return removed
+
+
+def apply_services(doc, wanted: list[str]) -> dict:
+    """Keep only the service options the offer actually includes.
+
+    Matching is a case-insensitive substring of the Service type cell, so
+    "loan" is enough to name "SEICA IL - Loan of modules" without the caller
+    reproducing the dash and spacing exactly.
+    """
+    table = find_service_table(doc)
+    if table is None:
+        return {"kept": [], "note": "no service contract table in the template"}
+
+    names = list_services(doc)
+    if not wanted:
+        return {"kept": names, "dropped": [], "note": "all kept (none specified)"}
+
+    needles = [w.strip().lower() for w in wanted if w.strip()]
+    kept, dropped = [], []
+    for row in list(table.rows)[1:]:
+        name = distinct_cells(row)[0].text.strip()
+        if not name:
+            continue
+        if any(n in name.lower() for n in needles):
+            kept.append(name)
+        else:
+            dropped.append(name)
+            row._tr.getparent().remove(row._tr)
+
+    for name in dropped:
+        _remove_service_explanation(doc, name, names)
+
+    unmatched = [w for w in wanted
+                 if not any(w.strip().lower() in n.lower() for n in names)]
+    if unmatched:
+        sys.exit("No service option matches " + ", ".join(repr(u) for u in unmatched)
+                 + ". Available: " + "; ".join(names))
+
+    # An empty table under a heading looks like a mistake, so when nothing is
+    # offered the whole section goes.
+    if not kept:
+        for paragraph in list(doc.paragraphs):
+            if paragraph.text.strip().lower().startswith("service contract options"):
+                paragraph._p.getparent().remove(paragraph._p)
+                break
+        table._tbl.getparent().remove(table._tbl)
+
+    return {"kept": kept, "dropped": dropped}
 
 
 # --------------------------------------------------------------------------- #
@@ -968,6 +1102,15 @@ def main(argv=None):
                     help="training line item to offer; repeatable, e.g. "
                          "--training install --training adv2w --training adv1w:2")
     ap.add_argument("--trainings-file", default=DEFAULT_TRAININGS)
+    ap.add_argument("--freight", nargs="?", const="", default=None,
+                    metavar="TERMS",
+                    help="keep the freight line, optionally naming the incoterm; "
+                         "omitted, the row is deleted")
+    ap.add_argument("--service", action="append", default=[], metavar="MATCH",
+                    help="service contract option to keep, matched on its name; "
+                         "repeatable. Omitted, all are kept")
+    ap.add_argument("--list-services", action="store_true",
+                    help="print the template's service contract options and exit")
     ap.add_argument("--capabilities", default=DEFAULT_CAPABILITIES,
                     help="customer-facing copy for 'What the configuration includes'")
     ap.add_argument("--theme", default=None,
@@ -984,6 +1127,11 @@ def main(argv=None):
         for entry in load_trainings(args.trainings_file):
             number = " (numbered #1, #2, ...)" if entry.get("numbered") else ""
             print(f"{entry['key']:10} {entry['part_number']:15} {entry['label']}{number}")
+        return 0
+    if args.list_services:
+        from docx import Document as _D
+        names = list_services(_D(args.template))
+        print("\n".join(names) if names else "(no service contract table)")
         return 0
     if args.list_systems:
         names = list_systems(args.systems_dir)
@@ -1031,11 +1179,21 @@ def main(argv=None):
         else:
             picture = {"status": "not inserted", "why": why}
 
-    # --- training line items ----------------------------------------------
-    trainings = {"written": 0, "note": "left as in the template"}
-    if args.training:
-        rows = parse_training_args(args.training, load_trainings(args.trainings_file))
-        trainings = apply_trainings(doc, rows)
+    # --- pricing: trainings, then freight -----------------------------------
+    # Trainings are written on every build now, because the catalogue marks the
+    # installation week "always" - an offer without it would be wrong even when
+    # nobody thought to ask.
+    catalog = load_trainings(args.trainings_file)
+    rows = parse_training_args(args.training, catalog)
+    trainings = apply_trainings(doc, rows) if rows else {
+        "written": 0, "note": "no training rows to write"}
+
+    pricing_table = find_pricing_table(doc)
+    freight = ({"kept": False, "note": "no pricing table"} if pricing_table is None
+               else apply_freight(pricing_table, args.freight))
+
+    # --- service contract options -------------------------------------------
+    services = apply_services(doc, args.service)
 
     # --- design tokens ------------------------------------------------------
     # The template is itself the design system's output, so generated rows
@@ -1068,6 +1226,8 @@ def main(argv=None):
         "author_notes_removed": notes_removed,
         "picture": picture,
         "trainings": trainings,
+        "freight": freight,
+        "services": services,
         "theme": theming,
     }
     if args.json:
@@ -1089,6 +1249,14 @@ def main(argv=None):
             print("  trainings offered   : " + ", ".join(trainings["part_numbers"]))
         elif trainings.get("note"):
             print(f"  trainings           : {trainings['note']}")
+        print("  freight line        : "
+              + ("kept - " + freight["terms"] if freight.get("kept")
+                 else "removed (not quoted)"))
+        if services.get("dropped"):
+            print("  service options     : kept " + ", ".join(services["kept"] or ["none"]))
+            print("    removed           : " + ", ".join(services["dropped"]))
+        elif services.get("kept"):
+            print(f"  service options     : all {len(services['kept'])} kept")
         if theming["applied"]:
             print(f"  theme               : {theming['headings']} headings, "
                   f"{theming['header_rows']} table headers, "

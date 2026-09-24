@@ -300,6 +300,41 @@ and class subheadings. It never touches page headers and footers (fixed logo
 artwork) or font sizes (the title is larger than the body on purpose, and
 flattening sizes would destroy the hierarchy while claiming to be a restyle).
 
+## Pricing rows and service options
+
+Three different rules govern what survives in the Pricing table, because the
+rows mean different things:
+
+| Row | Rule |
+|---|---|
+| the configured system | always kept, as a placeholder — every offer quotes the machine |
+| `INSTALL+TRAIN` | always written; the catalogue entry carries `"always": true` |
+| `ADV_TRAIN#n` | only those passed with `--training`; the rest are deleted |
+| freight | kept only with `--freight`; deleted otherwise |
+
+An unchosen row is **deleted rather than blanked**. A row reading
+`[ Freight and duties ]` in a sent offer cannot be distinguished by the customer
+from carriage that was forgotten.
+
+`--freight` takes an optional value: with text it names the incoterm, bare it
+keeps the template's wording, absent it removes the row.
+
+### Service contract options
+
+`--service` keeps an option, matched as a case-insensitive substring of the
+Service type cell, so `--service Italy` finds `SEICA S.p.A. (Italy) — Contract`.
+Passing none keeps all four — dropping services silently would be the wrong
+default. A needle matching nothing stops the build and lists what is available,
+rather than quietly producing an offer missing a service.
+
+`_remove_service_explanation` then deletes the dropped option's prose block:
+its bold sub-heading and every paragraph under it, stopping at the next service
+heading or the next 14pt section heading. Leaving that text behind would
+describe a service the price table no longer offers.
+
+When nothing is kept, the section heading and the table go too — an empty table
+under a live heading reads as a mistake.
+
 ## The capability copy library
 
 `assets/capabilities.json` holds the customer-facing copy for *What the

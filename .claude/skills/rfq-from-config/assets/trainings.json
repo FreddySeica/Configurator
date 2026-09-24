@@ -5,6 +5,8 @@
     "'numbered': true appends #1, #2, #3 ... in the order the trainings are added,",
     "which is how ADV_TRAIN#1 and ADV_TRAIN#2 appear in a quote.",
     "'description' is printed verbatim to the customer, so word it the way you",
+    "'always': true means the line is written into every offer without being",
+    "asked for - the installation week is part of every machine sale.",
     "want it read. Prices are never set here - they are filled in Word."
   ],
   "catalog": [
@@ -13,7 +15,8 @@
       "part_number": "INSTALL+TRAIN",
       "label": "Installation + basic training - 1 week onsite",
       "description": "One week onsite of one Seica engineer for machine installation and production start-up Including installation and basic training",
-      "numbered": false
+      "numbered": false,
+      "always": true
     },
     {
       "key": "adv2w",

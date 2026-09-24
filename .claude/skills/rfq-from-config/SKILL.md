@@ -15,8 +15,8 @@ Protocol no. / Date cells, the system photo, the **Configuration** table, the
 **What the configuration includes** summary, and the training lines in Pricing.
 
 **What it leaves for a person — on purpose:** the customer's name in the `To`
-cell, every price, the part numbers in the Pricing table, freight and
-incoterms, service-contract figures, and the blanks in Terms & Conditions. Prices and delivery terms are commitments to a
+cell, every price, the part numbers in the Pricing table, service-contract
+figures, and the blanks in Terms & Conditions. Prices and delivery terms are commitments to a
 customer; a wrong number there costs far more than a missing one. Say so when
 handing the file back rather than letting the user discover it.
 
@@ -56,18 +56,50 @@ no route from the `To` label to a value, so that cell always reaches the user
 blank. Mention it in the handover rather than asking for something you cannot
 use.
 
-**The trainings** — the export says nothing about them and the count varies per
-deal. Show the catalogue and ask in plain terms ("installation week plus how
-many advanced training weeks?"):
+**The trainings.** The installation week is written into every offer without
+being asked for — the catalogue marks it `always`, because a machine sale
+without installation would be wrong even when nobody thought to mention it. So
+what you are actually asking is *how many advanced training weeks, and of which
+length*:
 
 ```bash
 python3 scripts/build_rfq.py --list-trainings
 ```
 
-Then translate the answer into `--training` flags. Advanced trainings are
+Ask it the way a colleague would — "any advanced training weeks on top of the
+installation week?" — and translate the answer into `--training` flags. They are
 numbered `ADV_TRAIN#1`, `#2`, … in the order passed, so pass the longer sessions
-first if the user lists them that way. Omitting `--training` entirely leaves the
-template's own placeholder row, which is right when training has not come up.
+first if the user lists them that way. **Rows for trainings nobody chose are
+deleted, not left blank** — a blank row in a sent offer reads as an oversight.
+
+**Freight.** Ask whether this offer quotes carriage. `--freight "DDP — sea
+freight, duties and delivery to customer site"` keeps the line and names the
+incoterm; `--freight` alone keeps the template's wording; omitting it deletes
+the row. The customer should never have to guess whether carriage was forgotten
+or deliberately excluded.
+
+The machine's own price line is always kept, as a `[ Code ] / [ 0,00 ]`
+placeholder — every offer quotes the system, and only the price is missing.
+
+**The service contract options.** Ask which of these the offer includes:
+
+```bash
+python3 scripts/build_rfq.py --list-services
+```
+
+```
+SEICA IL — Service
+SEICA IL — Loan of modules
+SEICA S.p.A. (Italy) — Contract
+Recommended spare parts list
+```
+
+Pass each one to keep as `--service`, matched on any part of its name
+(`--service "Italy"` is enough). A dropped option loses **both** its table row
+and the paragraphs explaining it further down — an offer that drops a service
+from the price table but still describes it tells the customer they are getting
+something they are not. Passing no `--service` keeps all four, so the flag is
+only needed once the user has actually chosen.
 
 **The picture, only if the match is unsure.** The script infers the machine from
 the Base module code and reports what it picked; if it says `NONE`, show
@@ -85,11 +117,13 @@ python3 scripts/build_rfq.py CONFIG.xlsx \
   --attention "Mr. Cohen" \
   --protocol "PRV 260230/V_IL rev.01" \
   --description "Flying Probe Test Solution: Pilot VX | Dual-side functional and in-circuit test for vertical double-sided boards" \
-  --training install --training adv2w --training adv1w
+  --training adv2w --training adv1w \
+  --freight "DDP — sea freight, duties and delivery to customer site" \
+  --service "IL — Service" --service "Italy"
 ```
 
 `--description` splits on ` | ` into the title and the line under it.
-`--training KEY:N` adds N of one type. `--system` overrides the picture match,
+`--training KEY:N` adds N of one type; `INSTALL+TRAIN` needs no flag. `--system` overrides the picture match,
 `--picture PATH` uses a file outside the library, `--no-picture` omits it, and
 `--no-group` keeps raw export order instead of grouping by Class.
 
@@ -112,8 +146,8 @@ run it rather than eyeballing the table.
 ### 5. Hand back and say what is open
 
 Deliver the `.docx` and name what still needs the user: the customer's name in
-the `To` cell, the prices, the part numbers in Pricing, freight and incoterm,
-the service-contract figures, and the blanks in Terms. Do not describe the offer as ready to send.
+the `To` cell, the prices, the part numbers in Pricing, the service-contract
+figures, and the blanks in Terms. Do not describe the offer as ready to send.
 
 ## Included modules travel with their parent
 
