@@ -330,17 +330,42 @@ what keeps the two from saying the same thing twice.
 `{machine}` in `lead_in` is replaced with the solution name — the part of
 `--description` before the `|`.
 
-### Matching and gaps
+### Two gates, and an override
 
-`capability_entries` walks the configuration in export order and looks each
-module code up in the library. Codes with no entry are **not** written; if the
-row was a charged line, the code is returned in `uncovered` and printed after
-the build. That report is the mechanism for growing the library: it names
-exactly what a customer would have read about and did not.
+```json
+"include_classes": ["Hardware", "Programming/Repair Stations"],
+"class_overrides": { "PRBVIEW": "Hardware", "V8OFX": "Hardware" }
+```
 
-Falling back to the export description for an unmatched module would restore
-the mirror this section exists to avoid, so there is deliberately no such
-fallback.
+`capability_entries` walks the configuration in export order and writes a module
+only if **both** gates pass:
+
+1. its class is in `include_classes` — the section is about what the machine
+   does, so software licences, packaging, peripherals and automation options are
+   left to the table;
+2. the library has copy for its code.
+
+An entry with `group: "furthermore"` skips gate 1. Those are offer extras, not
+machine features, and excluding them by class would be wrong.
+
+A module that passes gate 1 but fails gate 2 is reported in `uncovered` and
+printed after the build — that report is how the library grows, naming exactly
+what a customer would have read about and did not. There is deliberately **no**
+fallback to the export description: filling a gap that way restores the mirror
+this section exists to avoid.
+
+`class_overrides` is applied by `apply_class_overrides` immediately after the
+export is read, before anything else looks at a class. So a refiled module moves
+in the Configuration table's class rows *and* in this section — one correction
+rather than two that can drift. The build prints each move:
+
+```
+reclassified        : V8OFX: Open fix -> Hardware; PRBVIEW: Mech.Tools -> Hardware
+```
+
+Note the side effect, which is usually wanted: moving the only member of a class
+removes that class row from the table entirely. `Open fix` disappears once
+`V8OFX` becomes Hardware.
 
 ### Sub-bullets
 

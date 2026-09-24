@@ -4,29 +4,33 @@
     "",
     "This section is NOT a second copy of the Configuration table. The table says",
     "what is in the crate; this says what the customer gets out of the machine.",
-    "So a module appears here only if someone has written copy for it - presence",
-    "in this file IS the curation, and a module with no entry is simply left out",
-    "of the prose rather than dumped in with its raw export description.",
     "",
-    "Each entry is keyed by the module code exactly as the configurator exports",
-    "it. Fields:",
+    "A module is written here only if BOTH are true:",
+    "  1. its class is in 'include_classes' below, and",
+    "  2. someone has written copy for it in 'capabilities'.",
+    "Entries marked group 'furthermore' skip the class test - they are offer",
+    "extras the sales manager chose to call out, not machine features.",
+    "",
+    "Copy can exist for a module that the class filter keeps out. That is fine and",
+    "deliberate: widening 'include_classes' later then costs nothing.",
+    "",
+    "'class_overrides' reclassifies a module everywhere - the Configuration table's",
+    "class rows as well as this section - so a module filed oddly by the",
+    "configurator lands where it belongs in both places.",
+    "",
+    "Entry fields:",
     "  text     - the line the customer reads. Lead with what they get.",
     "  bullets  - optional sub-points, indented one level under the line.",
-    "  group    - 'main' (default) or 'furthermore', which is written under a",
-    "             'Furthermore the offer includes:' lead-in.",
-    "  aliases  - other codes that should reuse this copy (e.g. the Goepel and",
-    "             JTAG boundary-scan variants all read the same to a customer).",
+    "  group    - 'main' (default) or 'furthermore'.",
+    "  aliases  - other codes that reuse this copy.",
     "",
-    "DRAFT WARNING: everything except DUALPROBESCOPE and NETDONGLE was drafted",
-    "from the configurator's own export descriptions and has not been reviewed by",
-    "Sales. Read a line before it goes to a customer. No figure here should be",
-    "invented - if a number is not in the export description or a previous offer,",
-    "leave it out rather than guessing."
+    "DRAFT WARNING: everything except DUALPROBESCOPE and NETDONGLE was drafted from",
+    "the configurator's own export descriptions and has not been reviewed by Sales.",
+    "Read a line before it goes to a customer. No figure here should be invented -",
+    "if a number is not in the export description or a previous offer, leave it out."
   ],
-
   "lead_in": "The solution offered is N°1 unit {machine}, equipped with:",
   "furthermore_lead_in": "Furthermore the offer includes:",
-
   "capabilities": {
     "VX": {
       "text": "Dual-side vertical flying probe with 8 flying electrical probes (4 + 4), giving full in-circuit and functional test capability on double-sided boards without a dedicated fixture."
@@ -54,7 +58,9 @@
     },
     "OBPFPDVC": {
       "text": "1 Seica general purpose programmer option for On-board programming (OBPFPDVC) - devices are programmed in place, with no separate programming step.",
-      "aliases": ["OBPDVC4"]
+      "aliases": [
+        "OBPDVC4"
+      ]
     },
     "PRBOOST": {
       "text": "PRBOOST feature which allows the user to get 2A from each of the 8 regular probes, so power rails and loads can be driven during functional test."
@@ -76,7 +82,10 @@
     },
     "FLYJTAG1": {
       "text": "1 Boundary Scan test with the integrated option - JTAG chains are exercised from the same program as the electrical test.",
-      "aliases": ["FLYGOEP2", "FLYGOEP3"]
+      "aliases": [
+        "FLYGOEP2",
+        "FLYGOEP3"
+      ]
     },
     "ICT": {
       "text": "In circuit test software for shorts, opens, passives and semiconductors."
@@ -101,7 +110,9 @@
     },
     "VLFUN": {
       "text": "VIVA Language for functional test, for custom test steps where the standard library does not cover a device.",
-      "aliases": ["VLICT"]
+      "aliases": [
+        "VLICT"
+      ]
     },
     "CAD": {
       "text": "CAD software database used to generate test programs directly from board data."
@@ -114,7 +125,10 @@
     },
     "S64NTX": {
       "text": "S64 matrix card with embedded traceability and extended performances, expanding the channels available to functional test.",
-      "aliases": ["S64FTX", "S64A3DX"]
+      "aliases": [
+        "S64FTX",
+        "S64A3DX"
+      ]
     },
     "S64H": {
       "text": "64 analogue channels matrix, high power, 500 VDC at 2 A."
@@ -124,7 +138,9 @@
     },
     "AP5": {
       "text": "Programmable linear power supplies for powering the board under test.",
-      "aliases": ["AP6"]
+      "aliases": [
+        "AP6"
+      ]
     },
     "LUV8M": {
       "text": "Multi Magaziner loader and unloader, up to 5+1+5 racks with boards held vertically, for unattended in-line operation."
@@ -153,6 +169,65 @@
     "NETDONGLE": {
       "text": "NETDONGLE: the existing NETDONGLE (SEICA P/N AE-D0NGLUSB-13) can be used to enable VIVA software on additional networked workstations, up to a maximum of ten (10) users.",
       "group": "furthermore"
+    },
+    "DONGLERPS": {
+      "text": "Licence dongle for the Repair Station software, so the repair bench runs independently of the tester."
+    },
+    "KEL": {
+      "text": "Large English keyboard supplied with the offline station."
+    },
+    "M22-16/9": {
+      "text": "23\" 16:9 monitor supplied with the offline station."
+    },
+    "PCW11TOW": {
+      "text": "PC tower, 64-bit, i7 9th generation, 16 GB RAM, 250 GB SSD and 1 TB hard disk, suitable for Windows 11."
+    },
+    "PRTERFP": {
+      "text": "USB thermal ticket printer, 40 columns, for printing results at the machine."
+    },
+    "UPS": {
+      "text": "700 VA uninterruptible power supply, so a mains dip does not interrupt a test run or corrupt the system."
+    },
+    "W11LTSC": {
+      "text": "Microsoft Windows 11 LTSC 64-bit licence - the long-term-servicing build, so feature updates cannot disturb a qualified test system."
+    },
+    "230V_AUTO": {
+      "text": "The automation module runs from 230 Vac single phase instead of 400 Vac three phase, so no three-phase supply is needed at the installation site."
+    },
+    "EMECOVE": {
+      "text": "Emergency circuitry separated from cover management, so the safety chain stays independent of the cover interlocks."
+    },
+    "BXAUT": {
+      "text": "Wooden box for the automation module."
+    },
+    "BXPLV8": {
+      "text": "Wooden box for the tester."
+    },
+    "PACKVAC": {
+      "text": "Vacuum bag packaging, protecting the machine against moisture in transit."
+    },
+    "PS 150V 5A": {
+      "text": "Customer-requested 150 V / 5 A power supply for the board under test."
+    },
+    "One Doungle": {
+      "text": "One dongle for the offline programming and repair station."
+    },
+    "two PCW11TOW": {
+      "text": "A second identical PC - one runs the system, the other serves as the programming and backup station."
+    },
+    "MAGAZINE": {
+      "text": "3 vertical magazines for the automation module."
+    },
+    "M22-16/9TS": {
+      "text": "23\" 16:9 touch screen monitor on the machine itself."
     }
+  },
+  "include_classes": [
+    "Hardware",
+    "Programming/Repair Stations"
+  ],
+  "class_overrides": {
+    "PRBVIEW": "Hardware",
+    "V8OFX": "Hardware"
   }
 }

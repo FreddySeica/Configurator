@@ -148,9 +148,23 @@ keyed by module code:
 }
 ```
 
-A module appears **only if someone has written copy for it** — presence in that
-file is the curation. Modules with no entry are left out of the prose and
-reported instead:
+A module is written **only if both** are true: its class is in
+`include_classes`, and someone has written copy for it. Today that is
+**Hardware** and **Programming/Repair Stations** — the section covers what the
+machine does, so software licences, packaging, peripherals and automation
+options stay in the table where they belong. Entries marked `group:
+"furthermore"` skip the class test, because offer extras like NETDONGLE are not
+machine features.
+
+Copy may exist for a module the class filter keeps out. That is deliberate:
+widening `include_classes` later then costs nothing.
+
+`class_overrides` refiles a module everywhere — the Configuration table's class
+rows as well as this section. `PRBVIEW` (filed Mech.Tools) and `V8OFX` (filed
+Open fix) are both moved to Hardware, so one correction keeps the two places
+from drifting apart. The build reports every move it makes.
+
+Modules that pass the class filter but have no copy are left out and reported:
 
 ```
 no customer copy yet: 16 module(s) - PCW11TOW, PRTERFP, UPS, ...

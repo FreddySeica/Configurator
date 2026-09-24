@@ -747,7 +747,27 @@ def load_capabilities(path: str) -> dict:
         "lead_in": raw.get("lead_in", ""),
         "furthermore_lead_in": raw.get("furthermore_lead_in", ""),
         "by_code": flat,
+        "include_classes": {c.strip().lower()
+                            for c in raw.get("include_classes", [])},
+        "class_overrides": {k.strip().upper(): v
+                            for k, v in raw.get("class_overrides", {}).items()},
     }
+
+
+def apply_class_overrides(items: list[dict], overrides: dict) -> list[str]:
+    """Refile modules the configurator puts in an odd class.
+
+    This runs before anything else reads the class, so a module moves in the
+    Configuration table's class rows and in the capability section alike -
+    one correction, not two that can drift apart.
+    """
+    moved = []
+    for item in items:
+        target = overrides.get((item["module"] or "").strip().upper())
+        if target and item["class"] != target:
+            moved.append(f"{item['module']}: {item['class']} -> {target}")
+            item["class"] = target
+    return moved
 
 
 def capability_entries(items: list[dict], library: dict) -> dict:
@@ -761,6 +781,7 @@ def capability_entries(items: list[dict], library: dict) -> dict:
     the Configuration table.
     """
     by_code = library["by_code"]
+    include = library.get("include_classes") or set()
     main, furthermore, uncovered, seen = [], [], [], set()
 
     for item in items:
@@ -768,6 +789,15 @@ def capability_entries(items: list[dict], library: dict) -> dict:
         if not code:
             continue
         entry = by_code.get(code)
+        is_extra = entry is not None and entry.get("group") == "furthermore"
+
+        # The section covers the machine itself, so it is limited to the classes
+        # the customer reads as capabilities. Offer extras marked "furthermore"
+        # sit outside that - they are not machine features and are listed
+        # because someone decided the offer should mention them.
+        if include and not is_extra and item["class"].strip().lower() not in include:
+            continue
+
         if entry is None:
             if item["qty"]:                 # a charged line nobody has written up
                 uncovered.append(item["module"])
@@ -775,7 +805,7 @@ def capability_entries(items: list[dict], library: dict) -> dict:
         if entry["code"] in seen:           # an alias of something already shown
             continue
         seen.add(entry["code"])
-        (furthermore if entry.get("group") == "furthermore" else main).append(entry)
+        (furthermore if is_extra else main).append(entry)
 
     return {"main": main, "furthermore": furthermore, "uncovered": uncovered}
 
@@ -957,6 +987,8 @@ def main(argv=None):
                  "--list-systems)")
 
     cfg = read_config(args.config)
+    library = load_capabilities(args.capabilities)
+    reclassified = apply_class_overrides(cfg["items"], library["class_overrides"])
     doc = Document(args.template)
 
     desc = args.description or cfg["title"] or ""
@@ -972,7 +1004,6 @@ def main(argv=None):
     stats = build_config_table(find_config_table(doc), cfg["items"], group=not args.no_group)
 
     # --- what the configuration includes -----------------------------------
-    library = load_capabilities(args.capabilities)
     matched = capability_entries(cfg["items"], library)
     capabilities = fill_capabilities(doc, matched, library, machine=solution.strip())
 
@@ -1025,6 +1056,7 @@ def main(argv=None):
         "groups": stats["groups"],
         "letterhead_filled": letterhead,
         "capabilities": capabilities,
+        "reclassified": reclassified,
         "author_notes_removed": notes_removed,
         "picture": picture,
         "trainings": trainings,
@@ -1056,6 +1088,8 @@ def main(argv=None):
             print(f"    tokens from       : {theming['source']}")
         print(f"  capability lines    : {capabilities['written']} "
               f"({capabilities.get('features', 0)} features)")
+        if reclassified:
+            print("  reclassified        : " + "; ".join(reclassified))
         if capabilities.get("uncovered"):
             missing = capabilities["uncovered"]
             print(f"  no customer copy yet: {len(missing)} module(s) - "
